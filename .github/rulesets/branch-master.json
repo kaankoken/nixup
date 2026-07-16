@@ -4,14 +4,22 @@
   "enforcement": "active",
   "conditions": {
     "ref_name": {
-      "include": ["~DEFAULT_BRANCH"],
+      "include": [
+        "~DEFAULT_BRANCH"
+      ],
       "exclude": []
     }
   },
   "rules": [
-    { "type": "deletion" },
-    { "type": "non_fast_forward" },
-    { "type": "required_linear_history" },
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "required_linear_history"
+    },
     {
       "type": "pull_request",
       "parameters": {
@@ -20,7 +28,10 @@
         "require_code_owner_review": false,
         "require_last_push_approval": false,
         "required_review_thread_resolution": false,
-        "allowed_merge_methods": ["squash", "rebase"]
+        "allowed_merge_methods": [
+          "squash",
+          "rebase"
+        ]
       }
     },
     {
@@ -29,30 +40,27 @@
         "strict_required_status_checks_policy": true,
         "do_not_enforce_on_create": false,
         "required_status_checks": [
-          { "context": "fixtures", "integration_id": 15368 },
-          { "context": "verify (ubuntu-latest)", "integration_id": 15368 },
-          { "context": "verify (macos-14)", "integration_id": 15368 },
-          { "context": "flake (ubuntu-latest, x86_64-linux, linux)", "integration_id": 15368 },
-          { "context": "flake (macos-14, aarch64-darwin, darwin)", "integration_id": 15368 }
-        ]
-      }
-    },
-    {
-      "type": "code_scanning",
-      "parameters": {
-        "code_scanning_tools": [
           {
-            "tool": "CodeQL",
-            "security_alerts_threshold": "high_or_higher",
-            "alerts_threshold": "errors_and_warnings"
+            "context": "fixtures",
+            "integration_id": 15368
+          },
+          {
+            "context": "verify (ubuntu-latest)",
+            "integration_id": 15368
+          },
+          {
+            "context": "verify (macos-14)",
+            "integration_id": 15368
+          },
+          {
+            "context": "flake (ubuntu-latest, x86_64-linux, linux)",
+            "integration_id": 15368
+          },
+          {
+            "context": "flake (macos-14, aarch64-darwin, darwin)",
+            "integration_id": 15368
           }
         ]
-      }
-    },
-    {
-      "type": "code_quality",
-      "parameters": {
-        "severity": "warnings"
       }
     }
   ],
