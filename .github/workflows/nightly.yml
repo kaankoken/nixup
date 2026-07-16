@@ -21,7 +21,7 @@ jobs:
     outputs:
       changed: ${{ steps.gate.outputs.changed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Skip if nightly already points at HEAD
         id: gate
         env:
@@ -41,13 +41,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Reset nightly release
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: gh release delete nightly --cleanup-tag --yes || true
       - name: Create empty nightly prerelease
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: nightly
           prerelease: true
@@ -72,7 +72,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
