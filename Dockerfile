@@ -24,8 +24,8 @@ RUN cargo build --release --target "$CARGO_BUILD_TARGET" --bin nixup \
  && cp "target/$CARGO_BUILD_TARGET/release/nixup" /app/nixup
 
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
-LABEL org.opencontainers.image.source="https://github.com/kaankoken/nix-setup"
+LABEL org.opencontainers.image.source="https://github.com/kaankoken/nixup"
 LABEL org.opencontainers.image.description="nixup CLI (binary-only: no Nix inside image)"
-LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 COPY --from=builder /app/nixup /usr/local/bin/nixup
 ENTRYPOINT ["/usr/local/bin/nixup"]

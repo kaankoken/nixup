@@ -110,7 +110,8 @@ scripts/archived/              # former Nu bootstrap/smoke
 - **verify-flake** — Linux + macOS: `nix flake show` + eval of **example** hosts (`my-mac`, `you@linux`); no switch
 - **verify-rust** — path-filtered: fmt, clippy `-D warnings`, cargo-deny, nextest
 - **fixtures** — golden CLI checks
-- **release / nightly** — multi-target binaries; Docker (GHCR); Homebrew formula (needs `HOMEBREW_DEPLOY_KEY`)
+- **release** — multi-target binaries; Docker `ghcr.io/<owner>/nixup:<semver|latest>`; Homebrew formula (needs `HOMEBREW_DEPLOY_KEY`)
+- **nightly** — rolling GitHub prerelease binaries + `ghcr.io/<owner>/nixup:nightly`
 
 ## Homebrew migration
 
