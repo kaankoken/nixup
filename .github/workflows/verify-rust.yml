@@ -47,7 +47,7 @@ jobs:
         os: [ubuntu-latest, macos-14]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # GitHub macOS images ship untrusted third-party taps that spam brew warnings.
       - name: Drop untrusted Homebrew taps (macOS)
