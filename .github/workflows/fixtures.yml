@@ -1,0 +1,50 @@
+name: fixtures
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/fixtures/**"
+      - ".github/workflows/fixtures.yml"
+      - "scripts/run-fixtures.sh"
+  push:
+    branches: [master]
+    paths:
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/fixtures/**"
+      - ".github/workflows/fixtures.yml"
+      - "scripts/run-fixtures.sh"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache-key: fixtures
+          rustflags: ""
+
+      - name: Build nixup
+        run: cargo build -p nixup
+
+      - name: Run fixtures
+        run: bash scripts/run-fixtures.sh

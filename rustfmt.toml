@@ -1,0 +1,5 @@
+edition = "2024"
+max_width = 100
+imports_granularity = "Crate"
+imports_layout = "Vertical"
+group_imports = "StdExternalCrate"

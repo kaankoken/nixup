@@ -1,0 +1,57 @@
+# Example nixup config for third parties.
+#
+# Setup:
+#   1. cp nixup.toml.example nixup.toml
+#   2. Edit [[hosts]] / [smoke] / [defaults] for your machines
+#   3. nixup hosts sync          # creates hosts/<id>/ + hosts/inventory.nix
+#   4. nixup bootstrap --yes     # or: nixup apply --yes
+#
+# Personal nixup.toml is gitignored — only this example is committed.
+
+schema_version = 1
+
+[defaults]
+dotfiles_url = "git@github.com:YOU/dotfiles.git"
+dotfiles_path = "~/.dotfiles"
+
+# --- Devices (source of truth for host modules) ---
+# `id` → hosts/<id>/default.nix after `nixup hosts sync`
+# `flake_attr` → flake output name (darwinConfigurations / homeConfigurations)
+# `match_hostnames` → auto-select when machine hostname matches
+# `os` → darwin | linux
+# optional: system, user, apply ("darwin" | "home-manager")
+
+[[hosts]]
+id = "my-mac"
+match_hostnames = ["my-mac"]   # scutil --get LocalHostName
+os = "darwin"
+flake_attr = "my-mac"
+# system = "aarch64-darwin"
+# user = "you"
+
+[[hosts]]
+id = "my-linux"
+match_hostnames = []           # sole linux host is selected on Linux automatically
+os = "linux"
+flake_attr = "you@linux"
+apply = "home-manager"
+user = "you"
+system = "x86_64-linux"
+
+# --- Smoke checks (optional customization) ---
+[smoke]
+required = [
+  "nu",
+  "starship",
+  "stow",
+  "git",
+  "rg",
+]
+optional = [
+  "rtk",
+  "claude",
+]
+
+[smoke.darwin]
+optional_commands = []
+optional_apps = []

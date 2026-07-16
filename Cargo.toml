@@ -1,0 +1,55 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/nixup-core",
+  "crates/nixup-ops",
+  "crates/nixup-smoke",
+  "crates/nixup",
+]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+authors = ["Kaan Köken <28218396+kaankoken@users.noreply.github.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/kaankoken/nix-setup"
+rust-version = "1.85"
+publish = false
+
+[workspace.dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+toml = "1.1.3"
+thiserror = "2.0.18"
+anyhow = "1.0.103"
+clap = { version = "4.6.2", features = ["derive"] }
+which = "8.0.5"
+tempfile = "3.27.0"
+rstest = "0.26.1"
+assert_cmd = "2.2.2"
+predicates = "3.1.4"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+needless_pass_by_value = "allow"
+module_name_repetitions = "allow"
+missing_const_for_fn = "allow"
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+indexing_slicing = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+
+[profile.release]
+opt-level = 3
+debug = false
+panic = "unwind"
+lto = true
+codegen-units = 1
+strip = true

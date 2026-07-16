@@ -4,6 +4,10 @@ result-*
 .direnv/
 .pre-commit-config.yaml.bak
 
+# Rust
+/target/
+**/*.rs.bk
+
 # Editor / OS
 .DS_Store
 *.swp
@@ -16,7 +20,12 @@ result-*
 /.tokensave/
 /.beads/
 
-# Personal / generated host inventory (examples stay tracked below)
+# Personal nixup config + design/plan docs (not for public repo)
+/nixup.toml
+/docs/superpowers/
+
+# Personal / generated host inventory + modules from `nixup hosts sync`.
+# Only the example inventory and example hosts stay tracked for CI/third parties.
 /hosts/inventory.nix
 /hosts/*
 !/hosts/inventory.example.nix

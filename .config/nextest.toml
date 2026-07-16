@@ -1,0 +1,11 @@
+[profile.default]
+fail-fast = false
+final-status-level = "fail"
+status-level = "pass"
+
+[profile.ci]
+fail-fast = true
+final-status-level = "fail"
+junit = { path = "target/nextest/ci/junit.xml" }
+retries = 0
+status-level = "skip"
