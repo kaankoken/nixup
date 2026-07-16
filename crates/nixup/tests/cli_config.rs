@@ -5,7 +5,7 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::tempdir;
 
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 fn write_mini_flake(dir: &std::path::Path) {
     fs::write(dir.join("flake.nix"), "{ outputs = _: {}; }\n").expect("write flake.nix");
     fs::write(

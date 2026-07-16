@@ -23,7 +23,7 @@ jobs:
     outputs:
       changed: ${{ steps.gate.outputs.changed }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Skip if nightly already points at HEAD
         id: gate
         env:
@@ -43,7 +43,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Reset nightly release
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -74,7 +74,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:

@@ -23,7 +23,7 @@ use crate::{
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let console = Console::new(cli.yes);
+    let console = Console::new(cli.yes, cli.verbose);
     let result = dispatch(&console, &cli);
     match result {
         Ok(code) => code,
@@ -45,7 +45,7 @@ fn dispatch(console: &Console, cli: &Cli) -> anyhow::Result<ExitCode> {
             commands::cmd_apply(console, flake, config, host.as_deref())
         }
         Command::Smoke { strict } => commands::cmd_smoke(console, flake, config, *strict),
-        Command::Doctor => commands::cmd_doctor(console, flake, config),
+        Command::Doctor => Ok(commands::cmd_doctor(console, flake, config)),
         Command::Update => commands::cmd_update(console, flake, config),
         Command::Hosts { action } => match action {
             None | Some(HostsAction::List) => commands::cmd_hosts_list(console, flake, config),

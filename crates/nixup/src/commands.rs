@@ -131,12 +131,11 @@ pub fn cmd_smoke(
 }
 
 /// `nixup doctor`
-#[allow(clippy::unnecessary_wraps)]
 pub fn cmd_doctor(
     console: &Console,
     flake: Option<&std::path::Path>,
     config: Option<&std::path::Path>,
-) -> Result<ExitCode> {
+) -> ExitCode {
     let mut issues = 0u32;
 
     match detect_identity() {
@@ -146,6 +145,7 @@ pub fn cmd_doctor(
                 identity.os.as_str(),
                 identity.hostname.as_deref().unwrap_or("(unknown)")
             ));
+            console.debug(&format!("identity ok: {identity:?}"));
         }
         Err(err) => {
             console.warn(&format!("identity: {err}"));
@@ -167,6 +167,7 @@ pub fn cmd_doctor(
         Ok(ctx) => {
             console.info(&format!("flake root: {}", ctx.flake_root.display()));
             console.info(&format!("config: {}", ctx.config_path.display()));
+            console.debug(&format!("hosts configured: {}", ctx.config.hosts.len()));
             match host_for(&ctx, None) {
                 Ok(host) => {
                     console.info(&format!("resolved host: {} ({})", host.id, host.flake_attr));
@@ -191,10 +192,10 @@ pub fn cmd_doctor(
 
     if issues == 0 {
         console.info("doctor: OK");
-        Ok(ExitCode::SUCCESS)
+        ExitCode::SUCCESS
     } else {
         console.warn(&format!("doctor: {issues} issue(s)"));
-        Ok(ExitCode::from(1))
+        ExitCode::from(1)
     }
 }
 

@@ -1,5 +1,4 @@
-//! The only module allowed to print or prompt.
-#![allow(clippy::print_stdout, clippy::print_stderr)]
+//! User-facing console (stdout/stderr via `Write`, not `print!` macros).
 
 use std::io::{
     self,
@@ -14,26 +13,40 @@ use nixup_smoke::{
 /// User-facing console adapter.
 pub struct Console {
     /// When true, confirmations always return true.
-    pub yes: bool,
+    pub yes:     bool,
+    /// When true, emit extra diagnostics on stderr.
+    pub verbose: bool,
 }
 
 impl Console {
-    /// Construct with global `--yes`.
+    /// Construct from global flags.
     #[must_use]
-    pub const fn new(yes: bool) -> Self {
-        Self { yes }
+    pub const fn new(yes: bool, verbose: bool) -> Self {
+        Self { yes, verbose }
     }
 
     /// Informational line on stdout.
-    #[allow(clippy::unused_self)]
     pub fn info(&self, message: &str) {
-        println!("{message}");
+        self.write_line(&mut io::stdout(), message);
     }
 
     /// Warning / diagnostic on stderr.
-    #[allow(clippy::unused_self)]
     pub fn warn(&self, message: &str) {
-        eprintln!("{message}");
+        self.write_line(&mut io::stderr(), message);
+    }
+
+    /// Extra diagnostics when `--verbose` is set.
+    pub fn debug(&self, message: &str) {
+        if self.verbose {
+            self.write_line(&mut io::stderr(), &format!("verbose: {message}"));
+        }
+    }
+
+    fn write_line(&self, writer: &mut dyn Write, message: &str) {
+        drop(writeln!(writer, "{message}"));
+        if self.verbose {
+            drop(writer.flush());
+        }
     }
 
     /// Confirm with `[y/N]`. Returns true if `--yes` or user types y/yes.
@@ -42,8 +55,8 @@ impl Console {
             self.info(&format!("{prompt} [yes]"));
             return true;
         }
-        print!("{prompt} [y/N] ");
-        io::stdout().flush().ok();
+        drop(write!(io::stdout(), "{prompt} [y/N] "));
+        drop(io::stdout().flush());
         let mut line = String::new();
         if io::stdin().read_line(&mut line).is_err() {
             return false;
