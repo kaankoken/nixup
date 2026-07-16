@@ -11,7 +11,6 @@ description = "Smoke checks for declared developer tools"
 
 [dependencies]
 nixup-core = { path = "../nixup-core" }
-thiserror = { workspace = true }
 which = { workspace = true }
 
 [dev-dependencies]

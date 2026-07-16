@@ -31,7 +31,7 @@ let
     gnutar
   ];
 
-  # rtk: optional — may not be in nixpkgs; Mac fallback via zerobrew later
+  # rtk: install when packaged in nixpkgs; otherwise zerobrew/brew on Mac (see modules/darwin/zerobrew.nix)
   rtkPkgs = optionalPkg "rtk";
 in
 {

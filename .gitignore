@@ -41,3 +41,7 @@ result-*
 !/hosts/my-mac/**
 !/hosts/my-linux/
 !/hosts/my-linux/**
+
+# Local planning notes (never commit)
+/todo.md
+/spec.md

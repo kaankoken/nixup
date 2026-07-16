@@ -340,7 +340,6 @@ version = "0.1.0"
 dependencies = [
  "nixup-core",
  "tempfile",
- "thiserror",
  "which",
 ]
 

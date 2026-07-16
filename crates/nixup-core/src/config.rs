@@ -21,7 +21,7 @@ pub const SUPPORTED_SCHEMA_VERSION: u32 = 1;
 /// Top-level nixup configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct NixupConfig {
-    /// Schema version for future migrations.
+    /// Config schema version (`SUPPORTED_SCHEMA_VERSION` is the max understood).
     #[serde(default = "default_schema_version")]
     pub schema_version: u32,
     /// Shared defaults (dotfiles, etc.).

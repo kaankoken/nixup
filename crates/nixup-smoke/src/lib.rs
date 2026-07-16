@@ -8,16 +8,7 @@ use nixup_core::{
     HostOs,
     SmokeConfig,
 };
-use thiserror::Error;
 use which::which;
-
-/// Smoke-layer errors (reserved for future extension).
-#[derive(Debug, Error)]
-pub enum SmokeError {
-    /// Placeholder for unexpected smoke failures.
-    #[error("smoke check failed: {0}")]
-    Failed(String),
-}
 
 /// Result of a single tool / app probe.
 #[derive(Debug, Clone, PartialEq, Eq)]

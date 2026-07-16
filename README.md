@@ -119,19 +119,16 @@ scripts/archived/              # former Nu bootstrap/smoke
 3. Uninstall overlapping brew formulas **only after** green smoke
 4. Keep brew/zerobrew for GUI leftovers if needed
 
-## Known gaps
-
-- **Outlook / WhatsApp / Signal / Slack**: best-effort cask names; may need App Store / vendor install
-- **Codex desktop (v1)**: **not** managed by this flake — install manually
-- **grok**: binary is `grok` (not `grok-build`)
-- **zerobrew**: experimental — brew used as fallback
-- **rtk**: optional in smoke
-- **Secrets**: not managed
-- **Docker image**: ships `nixup` only (no Nix runtime inside the image)
-- **Pure flake + personal hosts**: generated inventory is gitignored; pure eval uses examples unless you stage generated files locally
-
 ## Notes
 
 - **Determinate Nix:** `nix.enable = false` in nix-darwin so activation does not fight Determinate’s daemon.
 - Prefer applying as your user with a login that can sudo, or preserve `PATH`/`HOME` under sudo.
 - `home.stateVersion` is set only in `flake.nix`.
+- **GUI messaging apps** (Outlook / WhatsApp / Signal / Slack): cask install is best-effort; some need App Store / vendor installers.
+- **Codex desktop** is out of scope; install manually. CLI `codex` is covered by agents activation when npm is present.
+- **grok** binary name is `grok` (from x.ai install script), not `grok-build`.
+- **zerobrew** is experimental; Homebrew is the fallback on Mac for listed casks.
+- **rtk** is optional in smoke; Nix package when available, else zerobrew/brew on Mac.
+- **Secrets** stay outside this flake (keychain / existing logins).
+- **Docker image** ships the `nixup` binary only (no Nix daemon inside the image).
+- **Pure flakes** only see tracked files: personal generated hosts stay gitignored; stage them for a local pure eval, or use the example inventory (CI does).
