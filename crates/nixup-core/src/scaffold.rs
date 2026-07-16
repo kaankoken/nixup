@@ -214,21 +214,16 @@ pub fn sync_hosts(
 
         let default_nix = dir.join("default.nix");
         let exists = default_nix.is_file();
-        let created;
-        let skipped_existing;
-
-        if exists && !force {
-            created = false;
-            skipped_existing = true;
+        let (created, skipped_existing) = if exists && !force {
+            (false, true)
         } else {
             let body = render_host_default_nix(host);
             fs::write(&default_nix, body).map_err(|source| CoreError::ConfigRead {
                 path: default_nix.clone(),
                 source,
             })?;
-            created = !exists;
-            skipped_existing = false;
-        }
+            (!exists, false)
+        };
 
         items.push(HostSyncItem {
             id: host.id.clone(),
