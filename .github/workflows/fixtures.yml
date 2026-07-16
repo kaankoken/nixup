@@ -4,23 +4,8 @@ on:
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "crates/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/fixtures/**"
-      - ".github/workflows/fixtures.yml"
-      - "scripts/run-fixtures.sh"
   push:
     branches: [master]
-    paths:
-      - "crates/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/fixtures/**"
-      - ".github/workflows/fixtures.yml"
-      - "scripts/run-fixtures.sh"
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
