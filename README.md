@@ -132,3 +132,14 @@ scripts/archived/              # former Nu bootstrap/smoke
 - **Secrets** stay outside this flake (keychain / existing logins).
 - **Docker image** ships the `nixup` binary only (no Nix daemon inside the image).
 - **Pure flakes** only see tracked files: personal generated hosts stay gitignored; stage them for a local pure eval, or use the example inventory (CI does).
+
+## License
+
+Licensed under either of
+
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
+- Apache License 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+
+at your option. Unless you explicitly state otherwise, any contribution
+intentionally submitted for inclusion in this work shall be dual-licensed as
+above, without any additional terms or conditions.
