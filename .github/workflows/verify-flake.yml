@@ -14,6 +14,10 @@ concurrency:
 permissions:
   contents: read
 
+# Silence Node DEP0040 (punycode) from JS actions until upstream drops it.
+env:
+  NODE_OPTIONS: --no-deprecation
+
 jobs:
   flake:
     strategy:
@@ -37,13 +41,29 @@ jobs:
         run: nix flake show --all-systems
 
       # Uses hosts/inventory.example.nix when inventory.nix is absent (CI).
-      # --quiet drops noisy HM/nix-darwin options.json derivation warnings.
+      # Filter known upstream HM/nix-darwin options.json store-context noise.
       - name: Eval Linux homeConfiguration
         if: matrix.check == 'linux'
         run: |
-          nix --quiet eval --raw '.#homeConfigurations."you@linux".activationPackage.drvPath'
+          set -euo pipefail
+          err="$(mktemp)"
+          trap 'rm -f "$err"' EXIT
+          set +e
+          nix eval --raw '.#homeConfigurations."you@linux".activationPackage.drvPath' 2>"$err"
+          code=$?
+          set -e
+          grep -v "named 'options.json'" "$err" >&2 || true
+          exit "$code"
 
       - name: Eval Darwin configurations
         if: matrix.check == 'darwin'
         run: |
-          nix --quiet eval --raw .#darwinConfigurations.my-mac.config.system.build.toplevel.drvPath
+          set -euo pipefail
+          err="$(mktemp)"
+          trap 'rm -f "$err"' EXIT
+          set +e
+          nix eval --raw .#darwinConfigurations.my-mac.config.system.build.toplevel.drvPath 2>"$err"
+          code=$?
+          set -e
+          grep -v "named 'options.json'" "$err" >&2 || true
+          exit "$code"

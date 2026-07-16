@@ -30,6 +30,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # Silence Node DEP0040 (punycode) from JS actions until upstream drops it.
+  NODE_OPTIONS: --no-deprecation
+
 
 jobs:
   fixtures:

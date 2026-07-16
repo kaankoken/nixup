@@ -13,6 +13,8 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  NODE_OPTIONS: --no-deprecation
+
 
 jobs:
   create-release:

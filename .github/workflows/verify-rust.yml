@@ -36,6 +36,8 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # Silence Node DEP0040 (punycode) from JS actions until upstream drops it.
+  NODE_OPTIONS: --no-deprecation
 
 jobs:
   verify:
@@ -46,6 +48,18 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
+
+      # GitHub macOS images ship untrusted third-party taps that spam brew warnings.
+      - name: Drop untrusted Homebrew taps (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          for tap in $(brew tap 2>/dev/null || true); do
+            case "$tap" in
+              homebrew/*) ;;
+              *) brew untap "$tap" 2>/dev/null || true ;;
+            esac
+          done
 
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
