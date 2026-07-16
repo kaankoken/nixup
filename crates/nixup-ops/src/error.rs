@@ -17,9 +17,9 @@ pub enum OpsError {
         /// Command name or argv0.
         command: String,
         /// Exit status code if available.
-        status: i32,
+        status:  i32,
         /// Captured stderr (truncated).
-        stderr: String,
+        stderr:  String,
     },
 
     /// I/O error around a process or path.
@@ -29,7 +29,7 @@ pub enum OpsError {
         context: String,
         /// Underlying error.
         #[source]
-        source: std::io::Error,
+        source:  std::io::Error,
     },
 
     /// User declined a confirmation-gated operation.

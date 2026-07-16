@@ -31,7 +31,7 @@ pub fn nix_available() -> bool {
 
 /// `nix --version` first line, if available.
 pub fn nix_version() -> OpsResult<String> {
-    let _ = find_bin("nix")?;
+    find_bin("nix")?;
     let output = run_output("nix", &["--version"], None)?;
     let text = String::from_utf8_lossy(&output.stdout);
     Ok(text.lines().next().unwrap_or("nix").trim().to_owned())
@@ -55,15 +55,15 @@ pub fn install_nix_determinate() -> OpsResult<()> {
     } else {
         Err(OpsError::CommandFailed {
             command: "determinate-nix-installer".into(),
-            status: status.code().unwrap_or(-1),
-            stderr: "installer exited non-zero".into(),
+            status:  status.code().unwrap_or(-1),
+            stderr:  "installer exited non-zero".into(),
         })
     }
 }
 
 /// Apply flake for the given host entry.
 pub fn apply_host(flake_root: &Path, host: &HostEntry) -> OpsResult<()> {
-    let _ = find_bin("nix")?;
+    find_bin("nix")?;
     let flake_ref = format!(".#{}", host.flake_attr);
     match host.apply_kind() {
         ApplyKind::Darwin => run_status(
@@ -98,6 +98,6 @@ pub fn apply_host(flake_root: &Path, host: &HostEntry) -> OpsResult<()> {
 
 /// Run `nix flake update` in the flake root.
 pub fn flake_update(flake_root: &Path) -> OpsResult<()> {
-    let _ = find_bin("nix")?;
+    find_bin("nix")?;
     run_status("nix", &["flake", "update"], Some(flake_root))
 }

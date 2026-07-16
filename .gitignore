@@ -19,10 +19,18 @@ result-*
 .env.*
 /.tokensave/
 /.beads/
+.beads/hook-state/
+.claude/
+.headroom/
+.serena/
 
-# Personal nixup config + design/plan docs (not for public repo)
+# Personal nixup config (template: nixup.toml.example)
 /nixup.toml
+
+# Local design / plan docs (not for public repo)
 /docs/superpowers/
+/docs/plans/
+/docs/plans/**
 
 # Personal / generated host inventory + modules from `nixup hosts sync`.
 # Only the example inventory and example hosts stay tracked for CI/third parties.

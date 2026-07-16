@@ -26,13 +26,13 @@ pub struct NixupConfig {
     pub schema_version: u32,
     /// Shared defaults (dotfiles, etc.).
     #[serde(default)]
-    pub defaults: Defaults,
+    pub defaults:       Defaults,
     /// Configured devices / flake hosts.
     #[serde(default)]
-    pub hosts: Vec<HostEntry>,
+    pub hosts:          Vec<HostEntry>,
     /// Smoke-test tool lists.
     #[serde(default)]
-    pub smoke: SmokeConfig,
+    pub smoke:          SmokeConfig,
 }
 
 fn default_schema_version() -> u32 {
@@ -44,7 +44,7 @@ fn default_schema_version() -> u32 {
 pub struct Defaults {
     /// Git remote for cloning dotfiles.
     #[serde(default)]
-    pub dotfiles_url: Option<String>,
+    pub dotfiles_url:  Option<String>,
     /// Local path for stow root.
     #[serde(default)]
     pub dotfiles_path: Option<String>,
@@ -54,23 +54,23 @@ pub struct Defaults {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct HostEntry {
     /// Stable id used with `--host` (also default `hosts/<id>/` directory name).
-    pub id: String,
+    pub id:              String,
     /// Hostnames that auto-select this entry.
     #[serde(default)]
     pub match_hostnames: Vec<String>,
     /// `darwin` or `linux`.
-    pub os: HostOs,
+    pub os:              HostOs,
     /// Flake attribute for switch (e.g. `kaan-macmini` or `legolas@linux`).
-    pub flake_attr: String,
+    pub flake_attr:      String,
     /// Explicit apply backend; default derived from `os`.
     #[serde(default)]
-    pub apply: Option<ApplyKind>,
+    pub apply:           Option<ApplyKind>,
     /// Nixpkgs system (default: `aarch64-darwin` / `x86_64-linux`).
     #[serde(default)]
-    pub system: Option<String>,
+    pub system:          Option<String>,
     /// Unix username for home-manager / darwin user (default: `legolas`).
     #[serde(default)]
-    pub user: Option<String>,
+    pub user:            Option<String>,
 }
 
 impl HostEntry {
@@ -136,7 +136,7 @@ pub struct SmokeConfig {
     pub optional: Vec<String>,
     /// Darwin-only extras.
     #[serde(default)]
-    pub darwin: SmokeDarwinConfig,
+    pub darwin:   SmokeDarwinConfig,
 }
 
 /// Darwin-specific smoke extras.
@@ -147,7 +147,7 @@ pub struct SmokeDarwinConfig {
     pub optional_commands: Vec<String>,
     /// App names under `/Applications/{name}.app`.
     #[serde(default)]
-    pub optional_apps: Vec<String>,
+    pub optional_apps:     Vec<String>,
 }
 
 impl NixupConfig {
@@ -159,7 +159,7 @@ impl NixupConfig {
         })?;
         if config.schema_version > SUPPORTED_SCHEMA_VERSION {
             return Err(CoreError::UnsupportedSchema {
-                found: config.schema_version,
+                found:     config.schema_version,
                 supported: SUPPORTED_SCHEMA_VERSION,
             });
         }

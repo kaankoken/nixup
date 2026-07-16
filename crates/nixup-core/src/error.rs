@@ -25,7 +25,7 @@ pub enum CoreError {
     #[error("failed to read config at {path}: {source}")]
     ConfigRead {
         /// Path that failed.
-        path: PathBuf,
+        path:   PathBuf,
         /// Underlying I/O error.
         #[source]
         source: std::io::Error,
@@ -35,7 +35,7 @@ pub enum CoreError {
     #[error("failed to parse config at {path}: {source}")]
     ConfigParse {
         /// Path that failed.
-        path: PathBuf,
+        path:   PathBuf,
         /// Underlying parse error.
         #[source]
         source: toml::de::Error,
@@ -45,7 +45,7 @@ pub enum CoreError {
     #[error("unsupported schema_version {found} (supported: {supported})")]
     UnsupportedSchema {
         /// Version found in the file.
-        found: u32,
+        found:     u32,
         /// Maximum supported version.
         supported: u32,
     },
@@ -54,7 +54,7 @@ pub enum CoreError {
     #[error("unknown host id `{id}`; known: {known}")]
     UnknownHost {
         /// Requested host id.
-        id: String,
+        id:    String,
         /// Comma-separated known ids.
         known: String,
     },
@@ -66,11 +66,11 @@ pub enum CoreError {
     )]
     HostUnresolved {
         /// Detected OS label.
-        os: String,
+        os:       String,
         /// Detected hostname, if any.
         hostname: Option<String>,
         /// Comma-separated known ids.
-        known: String,
+        known:    String,
     },
 
     /// Config has no hosts array.

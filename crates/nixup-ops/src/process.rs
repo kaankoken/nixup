@@ -42,8 +42,8 @@ pub fn run_status(program: &str, args: &[&str], cwd: Option<&Path>) -> OpsResult
     } else {
         Err(OpsError::CommandFailed {
             command: format!("{program} {}", args.join(" ")),
-            status: status.code().unwrap_or(-1),
-            stderr: String::new(),
+            status:  status.code().unwrap_or(-1),
+            stderr:  String::new(),
         })
     }
 }

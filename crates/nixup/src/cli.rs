@@ -38,7 +38,7 @@ pub enum Command {
     Bootstrap {
         /// Host id from nixup.toml.
         #[arg(long)]
-        host: Option<String>,
+        host:       Option<String>,
         /// Skip smoke after apply.
         #[arg(long)]
         skip_smoke: bool,

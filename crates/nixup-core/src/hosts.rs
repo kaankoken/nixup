@@ -16,7 +16,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeIdentity {
     /// Detected OS class.
-    pub os: HostOs,
+    pub os:       HostOs,
     /// Hostname (`LocalHostName` / hostname), if known.
     pub hostname: Option<String>,
 }
@@ -66,9 +66,9 @@ pub fn resolve_host<'a>(
             .into_iter()
             .next()
             .ok_or_else(|| CoreError::HostUnresolved {
-                os: identity.os.as_str().to_owned(),
+                os:       identity.os.as_str().to_owned(),
                 hostname: identity.hostname.clone(),
-                known: known.clone(),
+                known:    known.clone(),
             });
     }
 
@@ -84,7 +84,6 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::config::NixupConfig;
 
     fn sample_config() -> NixupConfig {
         let toml = r#"
@@ -113,7 +112,7 @@ apply = "home-manager"
     fn resolve_by_hostname() {
         let config = sample_config();
         let identity = RuntimeIdentity {
-            os: HostOs::Darwin,
+            os:       HostOs::Darwin,
             hostname: Some("kaanezgi".into()),
         };
         let host = resolve_host(&config, &identity, None).expect("resolve");
@@ -124,7 +123,7 @@ apply = "home-manager"
     fn resolve_explicit_overrides_hostname() {
         let config = sample_config();
         let identity = RuntimeIdentity {
-            os: HostOs::Darwin,
+            os:       HostOs::Darwin,
             hostname: Some("kaan-macmini".into()),
         };
         let host = resolve_host(&config, &identity, Some("kaanezgi")).expect("resolve");
@@ -135,7 +134,7 @@ apply = "home-manager"
     fn resolve_linux_empty_match() {
         let config = sample_config();
         let identity = RuntimeIdentity {
-            os: HostOs::Linux,
+            os:       HostOs::Linux,
             hostname: Some("randombox".into()),
         };
         let host = resolve_host(&config, &identity, None).expect("resolve");
@@ -146,7 +145,7 @@ apply = "home-manager"
     fn unknown_explicit_host() {
         let config = sample_config();
         let identity = RuntimeIdentity {
-            os: HostOs::Darwin,
+            os:       HostOs::Darwin,
             hostname: None,
         };
         let err = resolve_host(&config, &identity, Some("nope")).expect_err("fail");
@@ -157,7 +156,7 @@ apply = "home-manager"
     fn unresolved_darwin_unknown_hostname() {
         let config = sample_config();
         let identity = RuntimeIdentity {
-            os: HostOs::Darwin,
+            os:       HostOs::Darwin,
             hostname: Some("someone-else".into()),
         };
         let err = resolve_host(&config, &identity, None).expect_err("fail");

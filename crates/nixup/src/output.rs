@@ -43,7 +43,7 @@ impl Console {
             return true;
         }
         print!("{prompt} [y/N] ");
-        let _ = io::stdout().flush();
+        io::stdout().flush().ok();
         let mut line = String::new();
         if io::stdin().read_line(&mut line).is_err() {
             return false;

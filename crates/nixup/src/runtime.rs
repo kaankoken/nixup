@@ -23,13 +23,13 @@ use nixup_core::{
 /// Loaded paths + config for a command invocation.
 pub struct AppContext {
     /// Directory containing flake.nix.
-    pub flake_root: PathBuf,
+    pub flake_root:  PathBuf,
     /// Path of the loaded config file.
     pub config_path: PathBuf,
     /// Parsed config.
-    pub config: NixupConfig,
+    pub config:      NixupConfig,
     /// Detected runtime identity.
-    pub identity: RuntimeIdentity,
+    pub identity:    RuntimeIdentity,
 }
 
 /// Build context from global CLI flags.

@@ -37,7 +37,7 @@ pub fn clone_dotfiles(url: &str, dest: &Path) -> OpsResult<()> {
     if dest.exists() {
         return Ok(());
     }
-    let _ = find_bin("git")?;
+    find_bin("git")?;
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent).map_err(|source| OpsError::Io {
             context: format!("create parent of {}", dest.display()),
@@ -52,6 +52,6 @@ pub fn stow_dotfiles(dotfiles_dir: &Path) -> OpsResult<()> {
     if !dotfiles_dir.is_dir() {
         return Err(OpsError::DotfilesMissing(dotfiles_dir.to_path_buf()));
     }
-    let _ = find_bin("stow")?;
+    find_bin("stow")?;
     run_status("stow", &["."], Some(dotfiles_dir))
 }

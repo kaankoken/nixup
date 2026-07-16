@@ -23,13 +23,13 @@ pub enum SmokeError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckResult {
     /// Display name (command or `app:Name`).
-    pub name: String,
+    pub name:     String,
     /// Whether the tool was found.
-    pub ok: bool,
+    pub ok:       bool,
     /// Whether missing fails `--strict`.
     pub required: bool,
     /// Path or `MISSING`.
-    pub detail: String,
+    pub detail:   String,
 }
 
 /// Full smoke report.
@@ -117,7 +117,7 @@ mod tests {
         let config = SmokeConfig {
             required: vec!["this-binary-should-not-exist-nixup-xyz".into()],
             optional: vec![],
-            darwin: SmokeDarwinConfig::default(),
+            darwin:   SmokeDarwinConfig::default(),
         };
         let report = run_smoke(&config, HostOs::Linux);
         assert!(!report.required_ok());
@@ -130,7 +130,7 @@ mod tests {
         let config = SmokeConfig {
             required: vec![],
             optional: vec!["this-binary-should-not-exist-nixup-xyz".into()],
-            darwin: SmokeDarwinConfig::default(),
+            darwin:   SmokeDarwinConfig::default(),
         };
         let report = run_smoke(&config, HostOs::Linux);
         assert!(report.required_ok());

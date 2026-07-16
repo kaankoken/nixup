@@ -25,11 +25,11 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostSyncItem {
     /// Host id from config.
-    pub id: String,
+    pub id:               String,
     /// Directory under `hosts/`.
-    pub path: PathBuf,
+    pub path:             PathBuf,
     /// Whether `default.nix` was newly written.
-    pub created: bool,
+    pub created:          bool,
     /// Whether an existing file was left unchanged.
     pub skipped_existing: bool,
 }
@@ -38,9 +38,9 @@ pub struct HostSyncItem {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostsSyncReport {
     /// Per-host outcomes.
-    pub hosts: Vec<HostSyncItem>,
+    pub hosts:             Vec<HostSyncItem>,
     /// Path written for inventory (if any).
-    pub inventory_path: PathBuf,
+    pub inventory_path:    PathBuf,
     /// Whether inventory was written.
     pub inventory_written: bool,
 }
@@ -252,7 +252,6 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
-    use crate::config::NixupConfig;
 
     fn sample_config() -> NixupConfig {
         let toml = r#"

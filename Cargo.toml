@@ -9,10 +9,10 @@ members = [
 
 [workspace.package]
 edition = "2024"
-version = "0.1.0"
+version = "0.1.0"                               # base only; each crate sets its OWN version
 authors = ["Kaan Köken <28218396+kaankoken@users.noreply.github.com>"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/kaankoken/nix-setup"
+repository = "https://github.com/kaankoken/nixup"
 rust-version = "1.85"
 publish = false
 
@@ -28,23 +28,54 @@ rstest = "0.26.1"
 assert_cmd = "2.2.2"
 predicates = "3.1.4"
 
+[workspace.lints.rust]
+ambiguous_negative_literals = "warn"
+closure_returning_async_block = "warn"
+explicit_outlives_requirements = "warn"
+let_underscore_drop = "warn"
+macro_use_extern_crate = "warn"
+missing_debug_implementations = "warn"
+non_ascii_idents = "warn"
+redundant_imports = "warn"
+redundant_lifetimes = "warn"
+single_use_lifetimes = "warn"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+unit_bindings = "warn"
+unsafe_attr_outside_unsafe = "warn"
+unused = "warn"
+unused_import_braces = "warn"
+
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
+# pedantic noise for a small CLI — allowed so zero-warning gates stay meaningful
 must_use_candidate = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 needless_pass_by_value = "allow"
 module_name_repetitions = "allow"
 missing_const_for_fn = "allow"
+# restriction wall
 unwrap_used = "warn"
 expect_used = "warn"
 panic = "warn"
 print_stdout = "warn"
 print_stderr = "warn"
 indexing_slicing = "warn"
-dbg_macro = "warn"
+dbg_macro = "warn"        # respects allow-dbg-in-tests in clippy.toml
 todo = "warn"
 unimplemented = "warn"
+str_to_string = "warn"
+get_unwrap = "warn"
+clone_on_ref_ptr = "warn"
+exit = "warn"
+mem_forget = "warn"
+
+[profile.dev]
+debug = "line-tables-only"
+opt-level = 0
+panic = "unwind"
+split-debuginfo = "unpacked"
 
 [profile.release]
 opt-level = 3
