@@ -1,0 +1,48 @@
+name: verify-flake
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  flake:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            system: x86_64-linux
+            check: linux
+          - os: macos-14
+            system: aarch64-darwin
+            check: darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Flake show
+        run: nix flake show --all-systems
+
+      # Uses hosts/inventory.example.nix when inventory.nix is absent (CI).
+      - name: Eval Linux homeConfiguration
+        if: matrix.check == 'linux'
+        run: |
+          nix eval --raw '.#homeConfigurations."you@linux".activationPackage.drvPath'
+
+      - name: Eval Darwin configurations
+        if: matrix.check == 'darwin'
+        run: |
+          nix eval --raw .#darwinConfigurations.my-mac.config.system.build.toplevel.drvPath

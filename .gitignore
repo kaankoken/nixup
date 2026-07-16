@@ -1,0 +1,26 @@
+# Nix
+result
+result-*
+.direnv/
+.pre-commit-config.yaml.bak
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
+
+# Local secrets and generated agent state (never commit)
+*.pem
+.env
+.env.*
+/.tokensave/
+/.beads/
+
+# Personal / generated host inventory (examples stay tracked below)
+/hosts/inventory.nix
+/hosts/*
+!/hosts/inventory.example.nix
+!/hosts/my-mac/
+!/hosts/my-mac/**
+!/hosts/my-linux/
+!/hosts/my-linux/**
