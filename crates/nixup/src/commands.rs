@@ -21,12 +21,14 @@ use nixup_ops::{
 };
 use nixup_smoke::run_smoke;
 
-use crate::output::Console;
-use crate::runtime::{
-    AppContext,
-    detect_identity,
-    host_for,
-    load_context,
+use crate::{
+    output::Console,
+    runtime::{
+        AppContext,
+        detect_identity,
+        host_for,
+        load_context,
+    },
 };
 
 /// Ensure Nix is present, optionally installing with confirmation.
@@ -74,10 +76,7 @@ pub fn cmd_bootstrap(
         host_entry.id, host_entry.flake_attr
     ));
 
-    if !console.confirm(&format!(
-        "Apply flake .#{}?",
-        host_entry.flake_attr
-    )) {
+    if !console.confirm(&format!("Apply flake .#{}?", host_entry.flake_attr)) {
         bail!("apply declined");
     }
 
@@ -107,10 +106,7 @@ pub fn cmd_apply(
         console.warn("Nix not found. Run `nixup install-nix` or `nixup bootstrap`.");
         return Ok(ExitCode::from(3));
     }
-    if !console.confirm(&format!(
-        "Apply flake .#{}?",
-        host_entry.flake_attr
-    )) {
+    if !console.confirm(&format!("Apply flake .#{}?", host_entry.flake_attr)) {
         bail!("apply declined");
     }
     apply_host(&ctx.flake_root, host_entry).context("apply flake")?;
@@ -172,21 +168,16 @@ pub fn cmd_doctor(
             console.info(&format!("flake root: {}", ctx.flake_root.display()));
             console.info(&format!("config: {}", ctx.config_path.display()));
             match host_for(&ctx, None) {
-                Ok(host) => console.info(&format!(
-                    "resolved host: {} ({})",
-                    host.id, host.flake_attr
-                )),
+                Ok(host) => {
+                    console.info(&format!("resolved host: {} ({})", host.id, host.flake_attr));
+                }
                 Err(err) => {
                     console.warn(&format!("host resolve: {err}"));
                     issues += 1;
                 }
             }
             let report = run_smoke(&ctx.config.smoke, ctx.identity.os);
-            let missing_req = report
-                .checks
-                .iter()
-                .filter(|c| c.required && !c.ok)
-                .count();
+            let missing_req = report.checks.iter().filter(|c| c.required && !c.ok).count();
             console.info(&format!(
                 "smoke required missing: {missing_req}/{}",
                 report.checks.iter().filter(|c| c.required).count()
@@ -308,7 +299,8 @@ pub fn cmd_hosts_sync(
             "Nix flakes only see tracked files: stage generated hosts for local pure eval; personal inventory/hosts stay gitignored (examples only are committed).",
         );
     }
-    console.info("Re-run after editing nixup.toml. Personal config stays in (gitignored) nixup.toml.");
+    console
+        .info("Re-run after editing nixup.toml. Personal config stays in (gitignored) nixup.toml.");
     Ok(ExitCode::SUCCESS)
 }
 

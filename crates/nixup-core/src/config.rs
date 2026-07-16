@@ -1,9 +1,11 @@
 //! Load and represent `nixup.toml` configuration.
 
-use std::fs;
-use std::path::{
-    Path,
-    PathBuf,
+use std::{
+    fs,
+    path::{
+        Path,
+        PathBuf,
+    },
 };
 
 use serde::Deserialize;
@@ -190,10 +192,7 @@ impl NixupConfig {
 /// Discover which config path to load.
 ///
 /// Order: explicit path → `NIXUP_CONFIG` → user config → `<flake_root>/nixup.toml`.
-pub fn discover_config_path(
-    flake_root: &Path,
-    explicit: Option<&Path>,
-) -> CoreResult<PathBuf> {
+pub fn discover_config_path(flake_root: &Path, explicit: Option<&Path>) -> CoreResult<PathBuf> {
     if let Some(path) = explicit {
         return Ok(path.to_path_buf());
     }
@@ -221,11 +220,19 @@ fn user_config_path() -> Option<PathBuf> {
         return Some(path);
     }
     let home = std::env::var_os("HOME")?;
-    Some(PathBuf::from(home).join(".config").join("nixup").join("config.toml"))
+    Some(
+        PathBuf::from(home)
+            .join(".config")
+            .join("nixup")
+            .join("config.toml"),
+    )
 }
 
 /// Load config using discovery rules.
-pub fn load_config(flake_root: &Path, explicit: Option<&Path>) -> CoreResult<(PathBuf, NixupConfig)> {
+pub fn load_config(
+    flake_root: &Path,
+    explicit: Option<&Path>,
+) -> CoreResult<(PathBuf, NixupConfig)> {
     let path = discover_config_path(flake_root, explicit)?;
     let config = NixupConfig::load_file(&path)?;
     Ok((path, config))
@@ -233,8 +240,9 @@ pub fn load_config(flake_root: &Path, explicit: Option<&Path>) -> CoreResult<(Pa
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::tempdir;
+
+    use super::*;
 
     const MINIMAL: &str = r#"
 schema_version = 1
@@ -247,8 +255,7 @@ flake_attr = "dev"
 
     #[test]
     fn parse_minimal_config() {
-        let config = NixupConfig::parse_str(Path::new("test.toml"), MINIMAL)
-            .expect("parse");
+        let config = NixupConfig::parse_str(Path::new("test.toml"), MINIMAL).expect("parse");
         assert_eq!(config.hosts.len(), 1);
         let host = config.hosts.first().expect("host");
         assert_eq!(host.id, "dev");
@@ -266,7 +273,10 @@ flake_attr = "dev"
     fn reject_future_schema() {
         let toml = "schema_version = 99\n[[hosts]]\nid=\"a\"\nos=\"linux\"\nflake_attr=\"a\"\n";
         let err = NixupConfig::parse_str(Path::new("x.toml"), toml).expect_err("schema");
-        assert!(matches!(err, CoreError::UnsupportedSchema { found: 99, .. }));
+        assert!(matches!(
+            err,
+            CoreError::UnsupportedSchema { found: 99, .. }
+        ));
     }
 
     #[test]
@@ -275,10 +285,7 @@ flake_attr = "dev"
         let path = dir.path().join("nixup.toml");
         fs::write(&path, MINIMAL).expect("write");
         let config = NixupConfig::load_file(&path).expect("load");
-        assert_eq!(
-            config.hosts.first().expect("host").flake_attr,
-            "dev"
-        );
+        assert_eq!(config.hosts.first().expect("host").flake_attr, "dev");
     }
 
     #[test]

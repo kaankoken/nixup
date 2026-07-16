@@ -5,13 +5,15 @@ use std::path::{
     PathBuf,
 };
 
-use crate::error::{
-    OpsError,
-    OpsResult,
-};
-use crate::process::{
-    find_bin,
-    run_status,
+use crate::{
+    error::{
+        OpsError,
+        OpsResult,
+    },
+    process::{
+        find_bin,
+        run_status,
+    },
 };
 
 /// Expand a leading `~` using `$HOME`.
@@ -42,11 +44,7 @@ pub fn clone_dotfiles(url: &str, dest: &Path) -> OpsResult<()> {
             source,
         })?;
     }
-    run_status(
-        "git",
-        &["clone", url, &dest.display().to_string()],
-        None,
-    )
+    run_status("git", &["clone", url, &dest.display().to_string()], None)
 }
 
 /// Run `stow .` from the dotfiles directory.

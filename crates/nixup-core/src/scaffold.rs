@@ -1,20 +1,24 @@
 //! Create host modules and flake inventory from `nixup.toml` host entries.
 
-use std::fs;
-use std::path::{
-    Path,
-    PathBuf,
+use std::{
+    fs,
+    path::{
+        Path,
+        PathBuf,
+    },
 };
 
-use crate::config::{
-    ApplyKind,
-    HostEntry,
-    HostOs,
-    NixupConfig,
-};
-use crate::error::{
-    CoreError,
-    CoreResult,
+use crate::{
+    config::{
+        ApplyKind,
+        HostEntry,
+        HostOs,
+        NixupConfig,
+    },
+    error::{
+        CoreError,
+        CoreResult,
+    },
 };
 
 /// Result of syncing one host directory.
@@ -106,9 +110,16 @@ pub fn render_inventory_nix(config: &NixupConfig) -> String {
          {\n  darwin = {\n",
     );
 
-    for host in config.hosts.iter().filter(|h| h.apply_kind() == ApplyKind::Darwin) {
+    for host in config
+        .hosts
+        .iter()
+        .filter(|h| h.apply_kind() == ApplyKind::Darwin)
+    {
         let dir = host_dir_name(host);
-        let system = host.system.as_deref().unwrap_or_else(|| default_system(host));
+        let system = host
+            .system
+            .as_deref()
+            .unwrap_or_else(|| default_system(host));
         let user = default_user(host);
         let host_name = host
             .match_hostnames
@@ -131,7 +142,10 @@ pub fn render_inventory_nix(config: &NixupConfig) -> String {
         .filter(|h| h.apply_kind() == ApplyKind::HomeManager)
     {
         let dir = host_dir_name(host);
-        let system = host.system.as_deref().unwrap_or_else(|| default_system(host));
+        let system = host
+            .system
+            .as_deref()
+            .unwrap_or_else(|| default_system(host));
         let user = default_user(host);
         let host_name = host
             .match_hostnames
@@ -240,9 +254,10 @@ pub fn sync_hosts(
 
 #[cfg(test)]
 mod tests {
+    use tempfile::tempdir;
+
     use super::*;
     use crate::config::NixupConfig;
-    use tempfile::tempdir;
 
     fn sample_config() -> NixupConfig {
         let toml = r#"
@@ -295,11 +310,7 @@ system = "x86_64-linux"
         let path = dir.path().join("hosts/my-mac/default.nix");
         fs::write(&path, "# custom\n").expect("overwrite marker");
         let report = sync_hosts(dir.path(), &config, false).expect("second");
-        let mac = report
-            .hosts
-            .iter()
-            .find(|h| h.id == "my-mac")
-            .expect("mac");
+        let mac = report.hosts.iter().find(|h| h.id == "my-mac").expect("mac");
         assert!(mac.skipped_existing);
         assert_eq!(fs::read_to_string(&path).expect("read"), "# custom\n");
     }

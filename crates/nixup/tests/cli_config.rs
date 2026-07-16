@@ -1,7 +1,8 @@
 // crates/nixup/tests/cli_config.rs
+use std::fs;
+
 use assert_cmd::Command;
 use predicates::prelude::*;
-use std::fs;
 use tempfile::tempdir;
 
 #[allow(clippy::unwrap_used, clippy::expect_used)]

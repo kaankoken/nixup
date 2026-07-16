@@ -7,20 +7,21 @@ use nixup_core::{
     HostEntry,
 };
 
-use crate::error::{
-    OpsError,
-    OpsResult,
-};
-use crate::process::{
-    command_exists,
-    find_bin,
-    run_output,
-    run_status,
+use crate::{
+    error::{
+        OpsError,
+        OpsResult,
+    },
+    process::{
+        command_exists,
+        find_bin,
+        run_output,
+        run_status,
+    },
 };
 
 /// Determinate Systems installer pipeline (curl | sh).
-pub const DETERMINATE_INSTALL_URL: &str =
-    "https://install.determinate.systems/nix";
+pub const DETERMINATE_INSTALL_URL: &str = "https://install.determinate.systems/nix";
 
 /// Whether `nix` is on PATH.
 #[must_use]
@@ -65,13 +66,11 @@ pub fn apply_host(flake_root: &Path, host: &HostEntry) -> OpsResult<()> {
     let _ = find_bin("nix")?;
     let flake_ref = format!(".#{}", host.flake_attr);
     match host.apply_kind() {
-        ApplyKind::Darwin => {
-            run_status(
-                "nix",
-                &["run", "nix-darwin", "--", "switch", "--flake", &flake_ref],
-                Some(flake_root),
-            )
-        }
+        ApplyKind::Darwin => run_status(
+            "nix",
+            &["run", "nix-darwin", "--", "switch", "--flake", &flake_ref],
+            Some(flake_root),
+        ),
         ApplyKind::HomeManager => {
             if command_exists("home-manager") {
                 run_status(

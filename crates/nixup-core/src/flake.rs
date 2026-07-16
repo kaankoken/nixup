@@ -53,9 +53,7 @@ pub fn resolve_flake_root(explicit: Option<&Path>) -> CoreResult<PathBuf> {
         if flake.is_file() {
             Ok(path)
         } else {
-            Err(CoreError::FlakeRootNotFound {
-                start: path,
-            })
+            Err(CoreError::FlakeRootNotFound { start: path })
         }
     } else {
         let cwd = std::env::current_dir().map_err(|source| CoreError::ConfigRead {
@@ -68,9 +66,11 @@ pub fn resolve_flake_root(explicit: Option<&Path>) -> CoreResult<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs;
+
     use tempfile::tempdir;
+
+    use super::*;
 
     #[test]
     fn finds_flake_walking_up() {

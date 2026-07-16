@@ -1,7 +1,9 @@
 //! Shared context loading for commands.
 
-use std::path::PathBuf;
-use std::process::Command;
+use std::{
+    path::PathBuf,
+    process::Command,
+};
 
 use anyhow::{
     Context,
@@ -36,8 +38,7 @@ pub fn load_context(
     config: Option<&std::path::Path>,
 ) -> Result<AppContext> {
     let flake_root = resolve_flake_root(flake).context("resolve flake root")?;
-    let (config_path, config) =
-        load_config(&flake_root, config).context("load nixup config")?;
+    let (config_path, config) = load_config(&flake_root, config).context("load nixup config")?;
     let identity = detect_identity()?;
     Ok(AppContext {
         flake_root,
@@ -69,7 +70,11 @@ fn uname_kernel() -> Result<String> {
 
 fn detect_hostname(os: HostOs) -> Option<String> {
     if os == HostOs::Darwin {
-        if let Ok(output) = Command::new("scutil").arg("--get").arg("LocalHostName").output() {
+        if let Ok(output) = Command::new("scutil")
+            .arg("--get")
+            .arg("LocalHostName")
+            .output()
+        {
             if output.status.success() {
                 let name = String::from_utf8_lossy(&output.stdout).trim().to_owned();
                 if !name.is_empty() {
@@ -90,9 +95,6 @@ fn detect_hostname(os: HostOs) -> Option<String> {
 }
 
 /// Resolve host entry from context + optional `--host`.
-pub fn host_for<'a>(
-    ctx: &'a AppContext,
-    host_flag: Option<&str>,
-) -> Result<&'a HostEntry> {
+pub fn host_for<'a>(ctx: &'a AppContext, host_flag: Option<&str>) -> Result<&'a HostEntry> {
     resolve_host(&ctx.config, &ctx.identity, host_flag).map_err(Into::into)
 }

@@ -1,9 +1,11 @@
 //! Thin wrappers around `std::process::Command`.
 
-use std::path::Path;
-use std::process::{
-    Command,
-    Output,
+use std::{
+    path::Path,
+    process::{
+        Command,
+        Output,
+    },
 };
 
 use which::which;

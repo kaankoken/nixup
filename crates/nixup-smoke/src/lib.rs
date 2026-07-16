@@ -108,8 +108,9 @@ fn check_app(app_name: &str) -> CheckResult {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use nixup_core::SmokeDarwinConfig;
+
+    use super::*;
 
     #[test]
     fn required_ok_false_when_missing() {

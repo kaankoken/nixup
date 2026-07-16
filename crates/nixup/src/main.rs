@@ -9,14 +9,16 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use crate::cli::{
-    Cli,
-    Command,
-    HostsAction,
-};
-use crate::output::{
-    Console,
-    exit_code_for,
+use crate::{
+    cli::{
+        Cli,
+        Command,
+        HostsAction,
+    },
+    output::{
+        Console,
+        exit_code_for,
+    },
 };
 
 fn main() -> ExitCode {
@@ -46,9 +48,7 @@ fn dispatch(console: &Console, cli: &Cli) -> anyhow::Result<ExitCode> {
         Command::Doctor => commands::cmd_doctor(console, flake, config),
         Command::Update => commands::cmd_update(console, flake, config),
         Command::Hosts { action } => match action {
-            None | Some(HostsAction::List) => {
-                commands::cmd_hosts_list(console, flake, config)
-            }
+            None | Some(HostsAction::List) => commands::cmd_hosts_list(console, flake, config),
             Some(HostsAction::Sync { force }) => {
                 commands::cmd_hosts_sync(console, flake, config, *force)
             }

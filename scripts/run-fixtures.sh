@@ -19,8 +19,16 @@ for dir in "$FIXTURES"/*; do
   expected="$dir/expected.txt"
   [[ -f "$cmd_file" ]] || continue
 
-  # shellcheck disable=SC2046
-  mapfile -t args < <(grep -v '^\s*#' "$cmd_file" | head -n1 | xargs -n1)
+  # First non-comment, non-empty line → CLI args (do NOT use xargs: GNU xargs
+  # defaults to `echo`, so `xargs -n1` on `--help` runs `echo --help`).
+  line="$(grep -vE '^\s*(#|$)' "$cmd_file" | head -n1 || true)"
+  if [[ -z "$line" ]]; then
+    echo "FAIL $name: empty cmd file" >&2
+    failed=1
+    continue
+  fi
+  # shellcheck disable=SC2206
+  args=($line)
   echo "==> fixture $name: nixup ${args[*]}"
 
   set +e
@@ -29,24 +37,23 @@ for dir in "$FIXTURES"/*; do
   set -e
 
   if [[ -f "$expected" ]]; then
-    if ! echo "$out" | grep -Fqf "$expected" 2>/dev/null; then
-      # allow expected to be a multi-line subset: each non-empty line must appear
-      while IFS= read -r line || [[ -n "$line" ]]; do
-        [[ -z "$line" ]] && continue
-        if ! grep -Fq -- "$line" <<<"$out"; then
-          echo "FAIL $name: expected line not found: $line" >&2
-          echo "--- output ---" >&2
-          echo "$out" >&2
-          failed=1
-        fi
-      done <"$expected"
-    fi
+    while IFS= read -r want || [[ -n "$want" ]]; do
+      [[ -z "$want" ]] && continue
+      if ! grep -Fq -- "$want" <<<"$out"; then
+        echo "FAIL $name: expected line not found: $want" >&2
+        echo "--- output ---" >&2
+        echo "$out" >&2
+        failed=1
+      fi
+    done <"$expected"
   fi
 
-  # default: help/version must succeed
+  # help/version must succeed
   if [[ "$name" == "version" || "$name" == "help" ]]; then
     if [[ $code -ne 0 ]]; then
       echo "FAIL $name: exit $code" >&2
+      echo "--- output ---" >&2
+      echo "$out" >&2
       failed=1
     fi
   fi

@@ -1,13 +1,15 @@
 //! Host resolution from config + runtime environment.
 
-use crate::config::{
-    HostEntry,
-    HostOs,
-    NixupConfig,
-};
-use crate::error::{
-    CoreError,
-    CoreResult,
+use crate::{
+    config::{
+        HostEntry,
+        HostOs,
+        NixupConfig,
+    },
+    error::{
+        CoreError,
+        CoreResult,
+    },
 };
 
 /// Runtime facts used for host resolution.
@@ -79,9 +81,10 @@ pub fn resolve_host<'a>(
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use super::*;
     use crate::config::NixupConfig;
-    use std::path::Path;
 
     fn sample_config() -> NixupConfig {
         let toml = r#"
