@@ -111,25 +111,24 @@ fn stage_personal_hosts_for_flake(flake_root: &Path) -> OpsResult<Vec<String>> {
     Ok(paths)
 }
 
-fn unstage_paths(flake_root: &Path, paths: &[String]) -> OpsResult<()> {
+fn unstage_paths(flake_root: &Path, paths: &[String]) {
     if paths.is_empty() {
-        return Ok(());
+        return;
     }
     if !command_exists("git") {
-        return Ok(());
+        return;
     }
     let mut args: Vec<&str> = vec!["restore", "--staged", "--"];
     let owned: Vec<&str> = paths.iter().map(String::as_str).collect();
     args.extend(owned);
     // Best-effort: leave staged on failure so the user can re-run apply.
     drop(run_status("git", &args, Some(flake_root)));
-    Ok(())
 }
 
 /// Apply flake for the given host entry.
 ///
 /// Darwin uses `sudo -H` because nix-darwin requires root for system activation.
-/// The absolute `nix` path is passed so sudo's secure_path still finds it.
+/// The absolute `nix` path is passed so sudo's `secure_path` still finds it.
 ///
 /// Personal (gitignored) host inventory is force-staged for pure flake eval,
 /// then unstaged after the switch attempt.
@@ -181,7 +180,7 @@ pub fn apply_host(flake_root: &Path, host: &HostEntry) -> OpsResult<()> {
         }
     };
     // Always try to unstage personal hosts so `git status` stays clean.
-    unstage_paths(flake_root, &staged)?;
+    unstage_paths(flake_root, &staged);
     result
 }
 
