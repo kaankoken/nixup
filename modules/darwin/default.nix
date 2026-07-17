@@ -8,6 +8,7 @@
 }:
 {
   imports = [
+    ./cloudflare-remote-access.nix
     ./zerobrew.nix
   ];
 
