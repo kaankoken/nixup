@@ -1,0 +1,13 @@
+target
+.git
+.github
+docs
+.beads
+.claude
+.tokensave
+.headroom
+# Keep the nightly/cranelift dev config out of the image build: the muslrust
+# base ships the stable toolchain, and `[unstable] codegen-backend` (nightly-only)
+# would break `cargo chef cook`. The release binary builds fine on stable.
+.cargo
+rust-toolchain.toml
