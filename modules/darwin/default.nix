@@ -32,15 +32,13 @@
     nushell
   ];
 
-  # System-visible packages (also on PATH for GUI apps)
-  environment.systemPackages =
-    with pkgs;
-    [
-      nushell
-      git
-      vim
-    ]
-    ++ lib.optional (pkgs ? aerospace) pkgs.aerospace;
+  # System-visible packages (also on PATH for GUI apps).
+  # aerospace / rtk / mole: zerobrew (see zerobrew.nix), not Nix.
+  environment.systemPackages = with pkgs; [
+    nushell
+    git
+    vim
+  ];
 
   # Fonts matching current Ghostty/dotfiles setup
   fonts.packages = with pkgs; [

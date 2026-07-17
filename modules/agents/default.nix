@@ -104,11 +104,11 @@ let
       fi
     fi
 
-    # --- rtk fallback if not provided by nixpkgs ---
+    # --- rtk: Darwin via zerobrew activation; not Nix ---
     if command -v rtk >/dev/null 2>&1; then
       ok "rtk present ($(rtk --version 2>/dev/null | head -1 || echo ok))"
     else
-      fail "rtk missing — on Mac use zerobrew/brew; on Linux install from https://www.rtk-ai.app/"
+      fail "rtk missing — on Mac: zerobrew (`zb install rtk`); on Linux: https://github.com/rtk-ai/rtk"
     fi
 
     exit 0

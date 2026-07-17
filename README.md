@@ -24,7 +24,7 @@ Automation is the **`nixup`** Rust CLI.
 
 **Do not hand-edit personal host modules as the long-term source of truth.** Edit `nixup.toml`, then re-run `nixup hosts sync`.
 
-**Pure Nix flakes only see tracked files.** After sync, personal `hosts/inventory.nix` and `hosts/<id>/` exist on disk but are gitignored, so pure eval falls back to the example inventory unless you temporarily `git add -f` them for a local build. Prefer not committing personal hosts. CI always uses the example inventory.
+**Pure Nix flakes only see tracked files.** After sync, personal `hosts/inventory.nix` and `hosts/<id>/` exist on disk but are gitignored, so pure eval would fall back to the example inventory. `nixup apply` / `bootstrap` force-stage those paths for the switch, then unstage them (nothing is committed). Prefer not committing personal hosts. CI always uses the example inventory.
 
 ## Install `nixup`
 
@@ -67,7 +67,7 @@ nix flake show
 # Linux
 nix run home-manager/master -- switch --flake .#"you@linux"
 # macOS
-nix run nix-darwin -- switch --flake .#my-mac
+sudo nix run nix-darwin -- switch --flake .#my-mac
 ```
 
 Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
@@ -83,11 +83,24 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 
 | Channel | What |
 |---------|------|
-| **Nix** | nushell, starship, stow, neovim, zellij, atuin, lazygit, modern CLIs (rg/fd/eza/…), uv, bun, zola, git, gh, rtk (if packaged), fonts, aerospace (if packaged) |
-| **Zerobrew** (Mac, fail-soft; brew fallback during migration) | ghostty, zed, signal, slack, whatsapp, microsoft-outlook, mole, rtk fallback |
-| **Activation** | rustup, headroom (`uv tool install "headroom-ai[proxy,ml,code,mcp,evals]"`), claude-code, **codex-cli**, beads, radicle, **grok** (`curl -fsSL https://x.ai/cli/install.sh \| bash`) |
+| **Nix** | CLI: nushell, starship, stow, neovim, zellij, atuin, lazygit, modern CLIs (rg/fd/eza/…), **uv**, bun, zola, git, gh, cloudflared, fonts. **GUI (Darwin):** `ghostty-bin`, `zed-editor`, `signal-desktop`, `slack`, `whatsapp-for-mac` |
+| **Zerobrew → Homebrew fallback** (Mac) | **`rtk`**, **`mole`**: `zb install` then `brew install`. **`aerospace`**: `zb` then `brew install --cask nikitabobko/tap/aerospace`. Soft-fail if both fail |
+| **uv** | **headroom** — `uv tool install "headroom-ai[proxy,ml,code,mcp,evals]"` (modules/agents) |
+| **Manual** | Microsoft Outlook, Codex desktop |
+| **Activation** | rustup, claude-code, **codex-cli**, beads, radicle, **grok** |
 
-**Ghostty** is **zerobrew/brew cask only** — not installed via `pkgs.ghostty` (avoids dual installs).
+### Sources of truth
+
+| Tool | Install path |
+|------|----------------|
+| rtk | zerobrew (`zb install rtk`) — not Nix |
+| mole | zerobrew (`zb install mole`) — not Nix |
+| aerospace | zb if indexed; else **`brew install --cask nikitabobko/tap/aerospace`** |
+| headroom | **uv** only |
+| Ghostty / Zed / Signal / Slack / WhatsApp | Nix home packages |
+| Outlook | Manual |
+
+Do **not** use `pkgs.ghostty` (Linux GTK) or `pkgs.zed` (unrelated data lake).
 
 ## Layout
 
@@ -115,21 +128,24 @@ scripts/archived/              # former Nu bootstrap/smoke
 
 ## Homebrew migration
 
-1. Apply flake and get `nixup smoke --strict` green for **required** tools
-2. Confirm `which nu rg nvim` prefer Nix profiles over Homebrew
-3. Uninstall overlapping brew formulas **only after** green smoke
-4. Keep brew/zerobrew for GUI leftovers if needed
+1. Install **zerobrew** first (Mac hard dependency): `curl -fsSL https://zerobrew.rs/install | bash`
+2. Apply flake and get `nixup smoke --strict` green for **required** tools (includes `zb` on Darwin)
+3. Confirm `which nu rg nvim` prefer Nix profiles over Homebrew
+4. Uninstall overlapping brew formulas **only after** green smoke
+5. Uninstall leftover Homebrew **casks** only after confirming Nix/manual apps work
 
 ## Notes
 
 - **Determinate Nix:** `nix.enable = false` in nix-darwin so activation does not fight Determinate’s daemon.
-- Prefer applying as your user with a login that can sudo, or preserve `PATH`/`HOME` under sudo.
+- **Darwin apply** runs `sudo -H <nix> run nix-darwin -- switch …` (nix-darwin requires root for system activation). Your account needs passwordless or interactive sudo; `nix` is invoked by absolute path so sudo’s secure_path is fine.
+- **Personal hosts** are gitignored; apply force-stages `hosts/inventory.nix` + host dirs so flake eval can see `darwinConfigurations.<your-host>`, then unstages.
 - `home.stateVersion` is set only in `flake.nix`.
-- **GUI messaging apps** (Outlook / WhatsApp / Signal / Slack): cask install is best-effort; some need App Store / vendor installers.
+- **GUI apps:** Nix home packages where possible; Outlook manual; smoke `optional_apps` only checks presence.
 - **Codex desktop** is out of scope; install manually. CLI `codex` is covered by agents activation when npm is present.
 - **grok** binary name is `grok` (from x.ai install script), not `grok-build`.
-- **zerobrew** is experimental; Homebrew is the fallback on Mac for listed casks.
-- **rtk** is optional in smoke; Nix package when available, else zerobrew/brew on Mac.
+- **zerobrew (`zb`)** first for **rtk / mole / aerospace**; if zb cannot resolve a package, fall back to **Homebrew** (`brew` on PATH or `/opt/homebrew/bin/brew`). AeroSpace: `brew install --cask nikitabobko/tap/aerospace`.
+- **headroom:** uv only (`modules/agents`); smoke lists it as optional.
+- **rtk / mole / aerospace:** optional in smoke; installed by zerobrew activation, not Nix.
 - **Secrets** stay outside this flake (keychain / existing logins).
 - **Docker image** ships the `nixup` binary only (no Nix daemon inside the image).
 - **Pure flakes** only see tracked files: personal generated hosts stay gitignored; stage them for a local pure eval, or use the example inventory (CI does).

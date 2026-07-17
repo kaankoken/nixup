@@ -297,7 +297,7 @@ pub fn cmd_hosts_sync(
             report.inventory_path.display()
         ));
         console.info(
-            "Nix flakes only see tracked files: stage generated hosts for local pure eval; personal inventory/hosts stay gitignored (examples only are committed).",
+            "Personal inventory/hosts stay gitignored; `nixup apply` force-stages them for the switch (nothing committed). Examples only are tracked for CI.",
         );
     }
     console

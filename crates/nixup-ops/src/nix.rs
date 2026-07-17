@@ -1,6 +1,9 @@
 //! Nix presence, version, apply, and flake update.
 
-use std::path::Path;
+use std::{
+    fs,
+    path::Path,
+};
 
 use nixup_core::{
     ApplyKind,
@@ -61,14 +64,97 @@ pub fn install_nix_determinate() -> OpsResult<()> {
     }
 }
 
+/// Personal `hosts/inventory.nix` + host dirs are gitignored so pure flake eval
+/// cannot see them. Force-stage them for the duration of apply, then unstage.
+///
+/// Returns relative paths that were staged (empty if nothing to do).
+fn stage_personal_hosts_for_flake(flake_root: &Path) -> OpsResult<Vec<String>> {
+    let inventory = flake_root.join("hosts").join("inventory.nix");
+    if !inventory.is_file() {
+        return Ok(Vec::new());
+    }
+    // Non-git trees already expose all files to path: flakes.
+    if !flake_root.join(".git").exists() {
+        return Ok(Vec::new());
+    }
+    find_bin("git")?;
+
+    let mut paths = vec!["hosts/inventory.nix".to_owned()];
+    let hosts_dir = flake_root.join("hosts");
+    let entries = fs::read_dir(&hosts_dir).map_err(|source| OpsError::Io {
+        context: format!("read {}", hosts_dir.display()),
+        source,
+    })?;
+    for entry in entries {
+        let entry = entry.map_err(|source| OpsError::Io {
+            context: format!("read entry in {}", hosts_dir.display()),
+            source,
+        })?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name == "inventory.nix"
+            || name == "inventory.example.nix"
+            || name == "my-mac"
+            || name == "my-linux"
+        {
+            continue;
+        }
+        if entry.path().is_dir() {
+            paths.push(format!("hosts/{name}"));
+        }
+    }
+
+    let mut args: Vec<&str> = vec!["add", "-f", "--"];
+    let owned: Vec<&str> = paths.iter().map(String::as_str).collect();
+    args.extend(owned);
+    run_status("git", &args, Some(flake_root))?;
+    Ok(paths)
+}
+
+fn unstage_paths(flake_root: &Path, paths: &[String]) -> OpsResult<()> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    if !command_exists("git") {
+        return Ok(());
+    }
+    let mut args: Vec<&str> = vec!["restore", "--staged", "--"];
+    let owned: Vec<&str> = paths.iter().map(String::as_str).collect();
+    args.extend(owned);
+    // Best-effort: leave staged on failure so the user can re-run apply.
+    drop(run_status("git", &args, Some(flake_root)));
+    Ok(())
+}
+
 /// Apply flake for the given host entry.
+///
+/// Darwin uses `sudo -H` because nix-darwin requires root for system activation.
+/// The absolute `nix` path is passed so sudo's secure_path still finds it.
+///
+/// Personal (gitignored) host inventory is force-staged for pure flake eval,
+/// then unstaged after the switch attempt.
 pub fn apply_host(flake_root: &Path, host: &HostEntry) -> OpsResult<()> {
-    find_bin("nix")?;
+    let nix = find_bin("nix")?;
+    let nix_bin = nix.to_str().ok_or_else(|| OpsError::Io {
+        context: "nix path is not valid UTF-8".into(),
+        source:  std::io::Error::new(std::io::ErrorKind::InvalidData, "non-utf8 path"),
+    })?;
     let flake_ref = format!(".#{}", host.flake_attr);
-    match host.apply_kind() {
+
+    let staged = stage_personal_hosts_for_flake(flake_root)?;
+    let result = match host.apply_kind() {
         ApplyKind::Darwin => run_status(
-            "nix",
-            &["run", "nix-darwin", "--", "switch", "--flake", &flake_ref],
+            "sudo",
+            &[
+                "-H",
+                nix_bin,
+                "run",
+                "nix-darwin",
+                "--",
+                "switch",
+                "--flake",
+                &flake_ref,
+            ],
             Some(flake_root),
         ),
         ApplyKind::HomeManager => {
@@ -80,7 +166,7 @@ pub fn apply_host(flake_root: &Path, host: &HostEntry) -> OpsResult<()> {
                 )
             } else {
                 run_status(
-                    "nix",
+                    nix_bin,
                     &[
                         "run",
                         "home-manager/master",
@@ -93,7 +179,10 @@ pub fn apply_host(flake_root: &Path, host: &HostEntry) -> OpsResult<()> {
                 )
             }
         }
-    }
+    };
+    // Always try to unstage personal hosts so `git status` stays clean.
+    unstage_paths(flake_root, &staged)?;
+    result
 }
 
 /// Run `nix flake update` in the flake root.

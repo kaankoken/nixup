@@ -54,6 +54,9 @@ pub fn run_smoke(config: &SmokeConfig, os: HostOs) -> SmokeReport {
     }
 
     if os == HostOs::Darwin {
+        for name in &config.darwin.required_commands {
+            checks.push(check_command(name, true));
+        }
         for name in &config.darwin.optional_commands {
             checks.push(check_command(name, false));
         }
@@ -83,17 +86,30 @@ fn check_command(name: &str, required: bool) -> CheckResult {
 }
 
 fn check_app(app_name: &str) -> CheckResult {
-    let path = PathBuf::from("/Applications").join(format!("{app_name}.app"));
-    let ok = path.is_dir();
-    CheckResult {
-        name: format!("app:{app_name}"),
-        ok,
-        required: false,
-        detail: if ok {
-            path.display().to_string()
-        } else {
-            "MISSING".into()
-        },
+    let bundle = format!("{app_name}.app");
+    let mut candidates = vec![
+        PathBuf::from("/Applications").join(&bundle),
+        PathBuf::from("/Applications/Nix Apps").join(&bundle),
+    ];
+    if let Ok(home) = std::env::var("HOME") {
+        let home = PathBuf::from(home);
+        candidates.push(home.join("Applications").join(&bundle));
+        candidates.push(home.join("Applications/Home Manager Apps").join(&bundle));
+    }
+    if let Some(path) = candidates.into_iter().find(|p| p.is_dir()) {
+        CheckResult {
+            name: format!("app:{app_name}"),
+            ok: true,
+            required: false,
+            detail: path.display().to_string(),
+        }
+    } else {
+        CheckResult {
+            name: format!("app:{app_name}"),
+            ok: false,
+            required: false,
+            detail: "MISSING".into(),
+        }
     }
 }
 
@@ -125,5 +141,37 @@ mod tests {
         };
         let report = run_smoke(&config, HostOs::Linux);
         assert!(report.required_ok());
+    }
+
+    #[test]
+    fn darwin_required_commands_fail_strict() {
+        let config = SmokeConfig {
+            required: vec![],
+            optional: vec![],
+            darwin: SmokeDarwinConfig {
+                required_commands: vec!["this-binary-should-not-exist-nixup-xyz".into()],
+                optional_commands: vec![],
+                optional_apps:     vec![],
+            },
+        };
+        let report = run_smoke(&config, HostOs::Darwin);
+        assert!(!report.required_ok());
+        assert!(report.checks.iter().any(|c| c.required && !c.ok));
+    }
+
+    #[test]
+    fn darwin_required_ignored_on_linux() {
+        let config = SmokeConfig {
+            required: vec![],
+            optional: vec![],
+            darwin: SmokeDarwinConfig {
+                required_commands: vec!["this-binary-should-not-exist-nixup-xyz".into()],
+                optional_commands: vec![],
+                optional_apps:     vec![],
+            },
+        };
+        let report = run_smoke(&config, HostOs::Linux);
+        assert!(report.required_ok());
+        assert!(report.checks.is_empty());
     }
 }

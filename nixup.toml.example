@@ -53,5 +53,7 @@ optional = [
 ]
 
 [smoke.darwin]
+# zerobrew (`zb`) is a hard dependency on macOS for GUI/cask installs
+required_commands = ["zb"]
 optional_commands = []
 optional_apps = []
