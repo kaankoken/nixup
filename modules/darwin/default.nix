@@ -8,7 +8,7 @@
 }:
 {
   imports = [
-    ./cloudflare-remote-access.nix
+    # cloudflare-remote-access: host-only (see hosts/*/default.nix)
     ./zerobrew.nix
   ];
 
