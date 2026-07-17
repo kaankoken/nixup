@@ -92,10 +92,10 @@ fn stage_personal_hosts_for_flake(flake_root: &Path) -> OpsResult<Vec<String>> {
         })?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
-        if name == "inventory.nix"
-            || name == "inventory.example.nix"
-            || name == "my-mac"
-            || name == "my-linux"
+        if name == "inventory.nix" ||
+            name == "inventory.example.nix" ||
+            name == "my-mac" ||
+            name == "my-linux"
         {
             continue;
         }
