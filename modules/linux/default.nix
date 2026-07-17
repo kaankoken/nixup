@@ -6,10 +6,10 @@
     xdg-utils
   ];
 
-  # rtk: if not in nixpkgs, user installs manually (smoke will report)
+  # rtk / mole / aerospace are Darwin zerobrew packages; on Linux install manually.
   home.activation.linuxRtkHint = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     if ! command -v rtk >/dev/null 2>&1; then
-      echo "[linux] rtk not on PATH — install from https://www.rtk-ai.app/ if headroom/agents need it"
+      echo "[linux] rtk not on PATH — https://github.com/rtk-ai/rtk (or brew if available)"
     fi
   '';
 }

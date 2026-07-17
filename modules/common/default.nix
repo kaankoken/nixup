@@ -1,8 +1,5 @@
 { lib, pkgs, ... }:
 let
-  # Prefer nixpkgs package when present; skip silently otherwise.
-  optionalPkg = name: lib.optional (pkgs ? ${name}) pkgs.${name};
-
   modernCli = with pkgs; [
     stow
     git
@@ -29,16 +26,17 @@ let
     tree
     unzip
     gnutar
+    cloudflared
   ];
-
-  # rtk: install when packaged in nixpkgs; otherwise zerobrew/brew on Mac (see modules/darwin/zerobrew.nix)
-  rtkPkgs = optionalPkg "rtk";
 in
 {
   # home.stateVersion: only in flake.nix user / homeConfiguration blocks
   # nixpkgs.config.allowUnfree: set on darwin module / Linux pkgs import (useGlobalPkgs)
+  #
+  # rtk: Darwin via zerobrew (not Nix). Linux: install manually (see modules/linux).
+  # headroom: uv tool install in modules/agents (not Nix).
 
-  home.packages = modernCli ++ rtkPkgs;
+  home.packages = modernCli;
 
   xdg.enable = true;
 

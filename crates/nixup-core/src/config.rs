@@ -142,10 +142,14 @@ pub struct SmokeConfig {
 /// Darwin-specific smoke extras.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
 pub struct SmokeDarwinConfig {
+    /// Required CLI tools on macOS only (e.g. `zb` / zerobrew).
+    #[serde(default)]
+    pub required_commands: Vec<String>,
     /// Optional CLI tools on macOS only.
     #[serde(default)]
     pub optional_commands: Vec<String>,
-    /// App names under `/Applications/{name}.app`.
+    /// App bundle names (without `.app`), searched under `/Applications`,
+    /// `/Applications/Nix Apps`, `~/Applications`, and `~/Applications/Home Manager Apps`.
     #[serde(default)]
     pub optional_apps:     Vec<String>,
 }
