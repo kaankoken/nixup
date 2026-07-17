@@ -98,17 +98,17 @@ fn check_app(app_name: &str) -> CheckResult {
     }
     if let Some(path) = candidates.into_iter().find(|p| p.is_dir()) {
         CheckResult {
-            name: format!("app:{app_name}"),
-            ok: true,
+            name:     format!("app:{app_name}"),
+            ok:       true,
             required: false,
-            detail: path.display().to_string(),
+            detail:   path.display().to_string(),
         }
     } else {
         CheckResult {
-            name: format!("app:{app_name}"),
-            ok: false,
+            name:     format!("app:{app_name}"),
+            ok:       false,
             required: false,
-            detail: "MISSING".into(),
+            detail:   "MISSING".into(),
         }
     }
 }
@@ -148,7 +148,7 @@ mod tests {
         let config = SmokeConfig {
             required: vec![],
             optional: vec![],
-            darwin: SmokeDarwinConfig {
+            darwin:   SmokeDarwinConfig {
                 required_commands: vec!["this-binary-should-not-exist-nixup-xyz".into()],
                 optional_commands: vec![],
                 optional_apps:     vec![],
@@ -164,7 +164,7 @@ mod tests {
         let config = SmokeConfig {
             required: vec![],
             optional: vec![],
-            darwin: SmokeDarwinConfig {
+            darwin:   SmokeDarwinConfig {
                 required_commands: vec!["this-binary-should-not-exist-nixup-xyz".into()],
                 optional_commands: vec![],
                 optional_apps:     vec![],
