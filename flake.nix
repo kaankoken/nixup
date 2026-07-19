@@ -9,6 +9,12 @@
 
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+
+    # Fork with kitty graphics protocol + yazi image rendering (default branch: main).
+    zellij = {
+      url = "github:kaankoken/zellij";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -17,6 +23,7 @@
       nixpkgs,
       nix-darwin,
       home-manager,
+      zellij,
       ...
     }:
     let
@@ -29,11 +36,15 @@
         else
           import ./hosts/inventory.example.nix;
 
+      overlays = [
+        zellij.overlays.default
+      ];
+
       # Shared special args for all modules
       mkSpecialArgs = system: {
         inherit self;
         flakeInputs = {
-          inherit nixpkgs nix-darwin home-manager;
+          inherit nixpkgs nix-darwin home-manager zellij;
         };
       };
 
@@ -62,6 +73,7 @@
             home-manager.darwinModules.home-manager
             {
               nixpkgs.hostPlatform = system;
+              nixpkgs.overlays = overlays;
               networking.hostName = hostName;
 
               users.users.${user} = {
@@ -97,7 +109,7 @@
         }:
         home-manager.lib.homeManagerConfiguration {
           pkgs = import nixpkgs {
-            inherit system;
+            inherit system overlays;
             config.allowUnfree = true;
           };
           extraSpecialArgs = mkSpecialArgs system // {
