@@ -83,11 +83,11 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 
 | Channel | What |
 |---------|------|
-| **Nix** | CLI: nushell, starship, stow, neovim, zellij, atuin, lazygit, modern CLIs (rg/fd/eza/…), **uv**, bun, zola, git, gh, cloudflared, fonts. **GUI (Darwin):** `ghostty-bin`, `zed-editor`, `signal-desktop`, `slack`, `whatsapp-for-mac` |
+| **Nix** | CLI: nushell, starship, stow, neovim, **zellij** ([kaankoken/zellij](https://github.com/kaankoken/zellij) fork — kitty image protocol + yazi), **yazi**, atuin, lazygit, git UX (`difftastic`, `mergiraf`, `git-filter-repo`), modern CLIs (rg/fd/eza/…), Rust helpers (`bacon`, `cargo-nextest`; toolchain via rustup), **uv**, bun, zola, git, gh, cloudflared, fonts. **GUI (Darwin):** `ghostty-bin`, `zed-editor`, `signal-desktop`, `slack`, `whatsapp-for-mac` |
 | **Zerobrew → Homebrew fallback** (Mac) | **`rtk`**, **`mole`**: `zb install` then `brew install`. **`aerospace`**: `zb` then `brew install --cask nikitabobko/tap/aerospace`. Soft-fail if both fail |
 | **uv** | **headroom** — `uv tool install "headroom-ai[proxy,ml,code,mcp,evals]"` (modules/agents) |
 | **Manual** | Microsoft Outlook, Codex desktop |
-| **Activation** | rustup, claude-code, **codex-cli**, beads, radicle, **grok** |
+| **Activation** | rustup, claude-code, **codex-cli** (bun), beads, **grok**, **pi** (bun; https://pi.dev) — **no Node/npm** |
 
 ### Sources of truth
 
@@ -97,7 +97,9 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 | mole | zerobrew (`zb install mole`) — not Nix |
 | aerospace | zb if indexed; else **`brew install --cask nikitabobko/tap/aerospace`** |
 | headroom | **uv** only |
+| pi / codex | **bun** global (`bun install -g …`); wrappers in `~/.local/bin` run under bun — **no Node/npm** |
 | Ghostty / Zed / Signal / Slack / WhatsApp | Nix home packages |
+| zellij | Flake input [kaankoken/zellij](https://github.com/kaankoken/zellij) (`main`) via `overlays.default` |
 | Outlook | Manual |
 
 Do **not** use `pkgs.ghostty` (Linux GTK) or `pkgs.zed` (unrelated data lake).
@@ -141,7 +143,7 @@ scripts/archived/              # former Nu bootstrap/smoke
 - **Personal hosts** are gitignored; apply force-stages `hosts/inventory.nix` + host dirs so flake eval can see `darwinConfigurations.<your-host>`, then unstages.
 - `home.stateVersion` is set only in `flake.nix`.
 - **GUI apps:** Nix home packages where possible; Outlook manual; smoke `optional_apps` only checks presence.
-- **Codex desktop** is out of scope; install manually. CLI `codex` is covered by agents activation when npm is present.
+- **Codex desktop** is out of scope; install manually. CLI `codex` is covered by agents activation via **bun** (not npm/node).
 - **grok** binary name is `grok` (from x.ai install script), not `grok-build`.
 - **zerobrew (`zb`)** first for **rtk / mole / aerospace**; if zb cannot resolve a package, fall back to **Homebrew** (`brew` on PATH or `/opt/homebrew/bin/brew`). AeroSpace: `brew install --cask nikitabobko/tap/aerospace`.
 - **headroom:** uv only (`modules/agents`); smoke lists it as optional.

@@ -6,8 +6,14 @@ let
     gh
     neovim
     zellij
+    yazi
     atuin
     lazygit
+    # Git UX — wired in ~/.gitconfig / ~/.gitattributes (not lazygit-specific):
+    #   diff.external = difft; diff.tool = difftastic; merge driver = mergiraf
+    difftastic
+    mergiraf
+    git-filter-repo # occasional history rewrite (strip secrets, extract subdir, …)
     ripgrep
     fd
     eza
@@ -27,6 +33,9 @@ let
     unzip
     gnutar
     cloudflared
+    # Rust workflow helpers (toolchain itself via rustup in modules/agents — not nixpkgs rustc)
+    bacon
+    cargo-nextest
   ];
 in
 {
@@ -35,6 +44,8 @@ in
   #
   # rtk: Darwin via zerobrew (not Nix). Linux: install manually (see modules/linux).
   # headroom: uv tool install in modules/agents (not Nix).
+  # rustc/cargo: rustup activation; bacon + cargo-nextest from Nix.
+  # JS CLIs (pi, codex): bun only — do not add nodejs/npm to this flake.
 
   home.packages = modernCli;
 
