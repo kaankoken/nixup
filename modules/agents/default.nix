@@ -56,10 +56,12 @@ let
       fi
       # Replace any previous symlink (e.g. asdf/npm) so we do not write through it.
       rm -f "$dest"
+      # $bin_name is expanded by this shell when writing the wrapper (not Nix).
+      # Do not use ''${bin_name} without escaping — Nix antiquotes ''${...}.
       printf '%s\n' \
         '#!/bin/sh' \
         '# Managed by nix-setup modules/agents — run under bun (no Node required).' \
-        "exec bun \"\$HOME/.bun/bin/${bin_name}\" \"\$@\"" \
+        "exec bun \"\$HOME/.bun/bin/$bin_name\" \"\$@\"" \
         >"$dest"
       chmod +x "$dest"
       export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
