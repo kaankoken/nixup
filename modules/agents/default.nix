@@ -147,25 +147,34 @@ let
       fi
     fi
 
-    # --- beads ---
-    # Prefer cargo (native). bun package needs a trusted postinstall to fetch the binary.
+    # --- beads (official native binary; do NOT use bun/npm @beads/bd or crates.io) ---
+    # https://github.com/gastownhall/beads — install.sh → ~/.local/bin/bd
+    # bun/npm package only ships a node wrapper; postinstall often fails without node.
+    # crates.io "beads" is a library stub with no binary.
     if command -v bd >/dev/null 2>&1 || command -v beads >/dev/null 2>&1; then
-      ok "beads present"
-    else
-      log "installing beads..."
-      if command -v cargo >/dev/null 2>&1 && cargo install beads 2>/dev/null; then
-        ok "beads via cargo"
-      elif require_bun && bun install -g @beads/bd && bun pm -g trust @beads/bd 2>/dev/null; then
-        # re-install so postinstall can download native bd
-        bun install -g @beads/bd 2>/dev/null || true
-        wrap_bun_cli bd || true
-        if command -v bd >/dev/null 2>&1 || [ -x "$HOME/.local/bin/bd" ]; then
-          ok "beads via bun"
-        else
-          fail "beads bun postinstall incomplete — try: cargo install beads"
-        fi
+      # If PATH still hits a broken bun/npm wrapper first, prefer real binary under ~/.local/bin
+      if [ -x "$HOME/.local/bin/bd" ]; then
+        export PATH="$HOME/.local/bin:$PATH"
+      fi
+      if bd version >/dev/null 2>&1 || bd --version >/dev/null 2>&1; then
+        ok "beads present ($(bd version 2>/dev/null | head -1 || bd --version 2>/dev/null | head -1 || echo ok))"
       else
-        fail "beads install failed — cargo install beads"
+        log "bd on PATH but broken (likely bun/npm wrapper without native binary) — reinstalling..."
+        rm -f "$HOME/.bun/bin/bd" 2>/dev/null || true
+        if curl -fsSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash; then
+          export PATH="$HOME/.local/bin:$PATH"
+          ok "beads reinstalled ($(bd version 2>/dev/null | head -1 || echo ok))"
+        else
+          fail "beads reinstall failed — curl -fsSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash"
+        fi
+      fi
+    else
+      log "installing beads via official install.sh..."
+      if curl -fsSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash; then
+        export PATH="$HOME/.local/bin:$PATH"
+        ok "beads installed ($(bd version 2>/dev/null | head -1 || echo ok))"
+      else
+        fail "beads install failed — curl -fsSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash"
       fi
     fi
 
