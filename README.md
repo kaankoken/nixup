@@ -87,7 +87,7 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 | **Zerobrew → Homebrew fallback** (Mac) | **`rtk`**, **`mole`**: `zb install` then `brew install`. **`aerospace`**: `zb` then `brew install --cask nikitabobko/tap/aerospace`. Soft-fail if both fail |
 | **uv** | **headroom** — `uv tool install "headroom-ai[proxy,ml,code,mcp,evals]"` (modules/agents) |
 | **Manual** | Microsoft Outlook, Codex desktop |
-| **Activation** | rustup, claude-code, **codex-cli** (bun), beads, **grok**, **pi** (bun; https://pi.dev) — **no Node/npm** |
+| **Activation** | rustup, claude-code, **codex-cli** (bun), **beads** (official install.sh → `~/.local/bin/bd`), **grok**, **pi** (bun; https://pi.dev) — **no Node/npm** |
 
 ### Sources of truth
 
