@@ -36,7 +36,7 @@ def main [
 
   # Soft / agent tools (rtk optional — not required for --strict)
   # grok: official x.ai CLI binary is `grok` (install.sh); not a separate `grok-build` command
-  for name in ["rtk" "headroom" "claude" "codex" "bd" "beads" "rad" "grok"] {
+  for name in ["rtk" "headroom" "claude" "codex" "bd" "beads" "rad" "grok" "pi"] {
     $checks = ($checks | append (check_cmd $name false))
   }
 

@@ -84,20 +84,23 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 | Channel | What |
 |---------|------|
 | **Nix** | CLI: nushell, starship, stow, neovim, **zellij** ([kaankoken/zellij](https://github.com/kaankoken/zellij) fork — kitty image protocol + yazi), **yazi**, atuin, lazygit, git UX (`difftastic`, `mergiraf`, `git-filter-repo`), modern CLIs (rg/fd/eza/…), Rust helpers (`bacon`, `cargo-nextest`; toolchain via rustup), **uv**, bun, zola, git, gh, cloudflared, fonts. **GUI (Darwin):** `ghostty-bin`, `zed-editor`, `signal-desktop`, `slack`, `whatsapp-for-mac` |
-| **Zerobrew → Homebrew fallback** (Mac) | **`rtk`**, **`mole`**: `zb install` then `brew install`. **`aerospace`**: `zb` then `brew install --cask nikitabobko/tap/aerospace`. Soft-fail if both fail |
+| **Zerobrew → Homebrew fallback** (Mac) | **`mole`**: `zb install` then `brew install`. **`aerospace`**: `zb` then `brew install --cask nikitabobko/tap/aerospace`. Soft-fail if both fail |
 | **uv** | **headroom** — `uv tool install "headroom-ai[proxy,ml,code,mcp,evals]"` (modules/agents) |
 | **Manual** | Microsoft Outlook, Codex desktop |
-| **Activation** | rustup, claude-code, **codex-cli** (bun), **beads** (official install.sh → `~/.local/bin/bd`), **grok**, **pi** (bun; https://pi.dev) — **no Node/npm** |
+| **Activation (curl)** | rustup, claude-code, **codex** (`chatgpt.com/codex/install.sh`), **rtk** (rtk-ai install.sh), **beads**, **grok**, **caveman** (skill installer; needs Node ≥18) |
+| **Activation (bun)** | **pi** only (`bun install -g`; wrappers in `~/.local/bin`) — **no Node/npm for pi** |
 
 ### Sources of truth
 
 | Tool | Install path |
 |------|----------------|
-| rtk | zerobrew (`zb install rtk`) — not Nix |
+| rtk | **curl** official install.sh (modules/agents) — not Nix / not zerobrew |
+| codex | **curl** `https://chatgpt.com/codex/install.sh \| sh` (modules/agents) |
+| caveman | **curl** JuliusBrussee/caveman `install.sh` (multi-agent skill; Node ≥18) |
 | mole | zerobrew (`zb install mole`) — not Nix |
 | aerospace | zb if indexed; else **`brew install --cask nikitabobko/tap/aerospace`** |
 | headroom | **uv** only |
-| pi / codex | **bun** global (`bun install -g …`); wrappers in `~/.local/bin` run under bun — **no Node/npm** |
+| pi | **bun** global (`bun install -g …`); wrappers in `~/.local/bin` — **no Node/npm** |
 | Ghostty / Zed / Signal / Slack / WhatsApp | Nix home packages |
 | zellij | Flake input [kaankoken/zellij](https://github.com/kaankoken/zellij) (`main`) via `overlays.default` |
 | Outlook | Manual |
@@ -143,11 +146,13 @@ scripts/archived/              # former Nu bootstrap/smoke
 - **Personal hosts** are gitignored; apply force-stages `hosts/inventory.nix` + host dirs so flake eval can see `darwinConfigurations.<your-host>`, then unstages.
 - `home.stateVersion` is set only in `flake.nix`.
 - **GUI apps:** Nix home packages where possible; Outlook manual; smoke `optional_apps` only checks presence.
-- **Codex desktop** is out of scope; install manually. CLI `codex` is covered by agents activation via **bun** (not npm/node).
+- **Codex desktop** is out of scope; install manually. CLI `codex` is agents activation via official **curl** installer.
 - **grok** binary name is `grok` (from x.ai install script), not `grok-build`.
-- **zerobrew (`zb`)** first for **rtk / mole / aerospace**; if zb cannot resolve a package, fall back to **Homebrew** (`brew` on PATH or `/opt/homebrew/bin/brew`). AeroSpace: `brew install --cask nikitabobko/tap/aerospace`.
+- **zerobrew (`zb`)** first for **mole / aerospace**; if zb cannot resolve a package, fall back to **Homebrew**. AeroSpace: `brew install --cask nikitabobko/tap/aerospace`.
+- **rtk / codex / caveman:** official curl installers in `modules/agents` (not zerobrew).
+- **caveman:** multi-agent skill (not a PATH binary); installer wants Node ≥18 — soft-fail if missing.
 - **headroom:** uv only (`modules/agents`); smoke lists it as optional.
-- **rtk / mole / aerospace:** optional in smoke; installed by zerobrew activation, not Nix.
+- **rtk / mole / aerospace:** optional in smoke; rtk via agents, mole/aerospace via zerobrew.
 - **Secrets** stay outside this flake (keychain / existing logins).
 - **Docker image** ships the `nixup` binary only (no Nix daemon inside the image).
 - **Pure flakes** only see tracked files: personal generated hosts stay gitignored; stage them for a local pure eval, or use the example inventory (CI does).

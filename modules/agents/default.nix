@@ -8,8 +8,9 @@ let
   # Fail-soft installer helpers run during home-manager activation.
   # Official channels change — keep commands documented and soft.
   #
-  # No system Node/npm: JS CLIs (pi, codex, …) install via bun and run under bun.
-  # Wrappers in ~/.local/bin exec: bun ~/.bun/bin/<name> …
+  # No system Node/npm for agent runtimes we control: pi installs via bun.
+  # codex / rtk / grok / claude / beads / caveman: official curl|sh installers.
+  # Wrappers in ~/.local/bin for bun CLIs: exec bun ~/.bun/bin/<name> …
   installScript = pkgs.writeShellScript "install-agent-tools" ''
     set +e
     export PATH="${pkgs.bun}/bin:${pkgs.uv}/bin:${pkgs.curl}/bin:${pkgs.bash}/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.cargo/bin:$PATH"
@@ -106,17 +107,17 @@ let
       fi
     fi
 
-    # --- codex-cli (bun global; no npm/node) ---
+    # --- codex CLI (official installer; not bun) ---
+    # https://chatgpt.com/codex/install.sh
     if command -v codex >/dev/null 2>&1; then
-      # Prefer bun wrapper if global bin exists
-      [ -e "$HOME/.bun/bin/codex" ] && wrap_bun_cli codex || true
-      ok "codex present"
+      ok "codex present ($(codex --version 2>/dev/null | head -1 || echo ok))"
     else
-      log "installing codex-cli via bun..."
-      if install_bun_cli "@openai/codex" codex; then
-        ok "codex-cli via bun ($(codex --version 2>/dev/null | head -1 || echo ok))"
+      log "installing codex via https://chatgpt.com/codex/install.sh ..."
+      if curl -fsSL https://chatgpt.com/codex/install.sh | sh; then
+        export PATH="$HOME/.local/bin:$PATH"
+        ok "codex install attempted ($(codex --version 2>/dev/null | head -1 || echo ok))"
       else
-        fail "codex-cli: bun install failed — desktop app is still manual"
+        fail "codex install failed — curl -fsSL https://chatgpt.com/codex/install.sh | sh (desktop app still manual)"
       fi
     fi
 
@@ -178,11 +179,49 @@ let
       fi
     fi
 
-    # --- rtk: Darwin via zerobrew activation; not Nix ---
+    # --- rtk (official installer; not zerobrew) ---
+    # https://github.com/rtk-ai/rtk
     if command -v rtk >/dev/null 2>&1; then
       ok "rtk present ($(rtk --version 2>/dev/null | head -1 || echo ok))"
     else
-      fail "rtk missing — on Mac: zerobrew (`zb install rtk`); on Linux: https://github.com/rtk-ai/rtk"
+      log "installing rtk via official install.sh..."
+      if curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh; then
+        export PATH="$HOME/.local/bin:$PATH"
+        ok "rtk install attempted ($(rtk --version 2>/dev/null | head -1 || echo ok))"
+      else
+        fail "rtk install failed — curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh"
+      fi
+    fi
+
+    # --- caveman (multi-agent skill; not a PATH CLI) ---
+    # https://github.com/JuliusBrussee/caveman
+    # Installer needs Node ≥18; safe to re-run. No system Node in this flake — soft-fail.
+    caveman_marker() {
+      [ -e "$HOME/.claude/skills/caveman/SKILL.md" ] \
+        || [ -e "$HOME/.claude/skills/caveman/skill.md" ] \
+        || [ -d "$HOME/.codex/skills/caveman" ] \
+        || [ -d "$HOME/.gemini/extensions/caveman" ] \
+        || [ -e "$HOME/.cursor/skills/caveman/SKILL.md" ] \
+        || [ -d "$HOME/.agents/skills/caveman" ]
+    }
+    if caveman_marker; then
+      ok "caveman skill markers present"
+    else
+      log "installing caveman via https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh ..."
+      if command -v node >/dev/null 2>&1 || command -v bun >/dev/null 2>&1; then
+        # Prefer real node if present; otherwise try with bun on PATH (install may still need node).
+        if curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash; then
+          if caveman_marker; then
+            ok "caveman installed"
+          else
+            ok "caveman install script finished (markers not detected — open an agent and /caveman)"
+          fi
+        else
+          fail "caveman install failed — needs Node ≥18: curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash"
+        fi
+      else
+        fail "caveman skipped — Node ≥18 required by installer (not provided by this flake)"
+      fi
     fi
 
     exit 0

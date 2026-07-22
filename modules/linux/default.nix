@@ -6,10 +6,10 @@
     xdg-utils
   ];
 
-  # rtk / mole / aerospace are Darwin zerobrew packages; on Linux install manually.
-  home.activation.linuxRtkHint = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+  # mole / aerospace are Darwin zerobrew packages; rtk is agents curl install (all OS).
+  home.activation.linuxDarwinOnlyHint = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     if ! command -v rtk >/dev/null 2>&1; then
-      echo "[linux] rtk not on PATH — https://github.com/rtk-ai/rtk (or brew if available)"
+      echo "[linux] rtk not on PATH yet — agents activation: curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh"
     fi
   '';
 }
