@@ -6,15 +6,14 @@
 }:
 let
   # Prefer zerobrew; fall back to Homebrew when zb cannot resolve a formula.
-  # - rtk:  https://github.com/rtk-ai/rtk          (homebrew/core)
   # - mole: https://github.com/tw93/mole           (homebrew/core)
   # - aerospace: https://github.com/nikitabobko/AeroSpace
   #   (cask: nikitabobko/tap/aerospace — not in zb’s core index → brew fallback)
   #
+  # rtk: official curl install in modules/agents (not zerobrew).
   # GUI apps (Ghostty/Zed/Signal/…) live in modules/darwin/home.nix via Nix.
   # headroom is uv tool install — see modules/agents.
   formulas = [
-    "rtk"
     "mole"
   ];
 
@@ -143,7 +142,6 @@ let
       fi
       log "WARN: $name not installed"
       case "$name" in
-        rtk)  log "hint: https://github.com/rtk-ai/rtk" ;;
         mole) log "hint: https://github.com/tw93/mole" ;;
       esac
     }
@@ -183,7 +181,7 @@ let
 
     ensure_aerospace
 
-    log "zerobrew activation complete (rtk/mole/aerospace: zb then brew; headroom via uv)"
+    log "zerobrew activation complete (mole/aerospace: zb then brew; rtk/headroom via agents)"
     exit 0
   '';
 in
@@ -191,7 +189,7 @@ in
   # postActivation runs as root under `sudo darwin-rebuild`. Must re-exec as the
   # real user with -H so zb uses /Users/<user>, not /var/root.
   system.activationScripts.postActivation.text = lib.mkAfter ''
-    echo "=== zerobrew activation (rtk, mole, aerospace; brew fallback) ==="
+    echo "=== zerobrew activation (mole, aerospace; brew fallback) ==="
     if id "${user}" >/dev/null 2>&1; then
       sudo -u "${user}" -H \
         env HOME="${userHome}" USER="${user}" LOGNAME="${user}" \

@@ -6,9 +6,9 @@
 # - signal-desktop / slack / whatsapp-for-mac: proprietary DMGs in nixpkgs
 # - Microsoft Outlook: not in nixpkgs — install manually
 #
-# Not here (zerobrew / uv instead):
-# - aerospace, rtk, mole → modules/darwin/zerobrew.nix
-# - headroom → modules/agents (uv tool install)
+# Not here (zerobrew / agents instead):
+# - aerospace, mole → modules/darwin/zerobrew.nix
+# - rtk, codex, caveman, headroom → modules/agents
 { lib, pkgs, ... }:
 let
   optionalPkg = name: lib.optional (pkgs ? ${name}) pkgs.${name};

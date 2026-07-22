@@ -42,10 +42,10 @@ in
   # home.stateVersion: only in flake.nix user / homeConfiguration blocks
   # nixpkgs.config.allowUnfree: set on darwin module / Linux pkgs import (useGlobalPkgs)
   #
-  # rtk: Darwin via zerobrew (not Nix). Linux: install manually (see modules/linux).
+  # rtk / codex / caveman: official curl installers in modules/agents (not Nix).
   # headroom: uv tool install in modules/agents (not Nix).
   # rustc/cargo: rustup activation; bacon + cargo-nextest from Nix.
-  # JS CLIs (pi, codex): bun only — do not add nodejs/npm to this flake.
+  # JS CLIs still on bun: pi only — do not add nodejs/npm to this flake.
 
   home.packages = modernCli;
 

@@ -34,7 +34,7 @@
   ];
 
   # System-visible packages (also on PATH for GUI apps).
-  # aerospace / rtk / mole: zerobrew (see zerobrew.nix), not Nix.
+  # aerospace / mole: zerobrew (see zerobrew.nix). rtk: modules/agents curl install.
   environment.systemPackages = with pkgs; [
     nushell
     git
