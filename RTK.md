@@ -1,7 +1,8 @@
 # RTK - Rust Token Killer
 
 **Usage**: Token-optimized CLI proxy for shell commands.
-Part of the shared agent stack — see `AGENTS.md` for tokensave, beads, headroom, context-mode, etc.
+Part of the shared agent stack — see `AGENTS.md` for tokensave, beads, headroom,
+context-mode, local CLI toolkit (`rg`/`fd`/`eza`/`bat`/`sd`/`ast-grep`/…), etc.
 
 ## Rule
 

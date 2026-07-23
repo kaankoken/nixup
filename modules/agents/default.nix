@@ -9,11 +9,11 @@ let
   # Official channels change — keep commands documented and soft.
   #
   # Shared stack (see AGENTS.md): RTK, beads, headroom, tokensave, caveman,
-  # context-mode, context7, ast-grep (Nix). Code graph = tokensave only
+  # ponytail, context-mode, context7, ast-grep (Nix). Code graph = tokensave only
   # (codebase-memory is stripped on activate).
   #
   # No system Node/npm for agent runtimes we control: pi / context-mode via bun.
-  # codex / rtk / grok / claude / beads / caveman: official curl|sh installers.
+  # codex / rtk / grok / claude / beads / caveman / ponytail: official installers.
   # codex must NEVER use wrap_bun_cli — that made Codex think it was npm-managed
   # and could write-through-symlink clobber ~/.codex/packages/standalone/.../bin/codex.
   # Prefer ~/.local/bin so GUI / minimal-PATH agent shells still find tools.
@@ -552,6 +552,152 @@ let
       fi
       if [ -n "$_caveman_node_shim" ]; then
         rm -rf "$_caveman_node_shim"
+      fi
+    fi
+
+    # --- ponytail (multi-agent skill; lean code generation / YAGNI) ---
+    # https://github.com/DietrichGebert/ponytail
+    # Complements caveman: caveman shrinks prose, ponytail shrinks generated code.
+    ponytail_marker() {
+      [ -e "$HOME/.claude/skills/ponytail/SKILL.md" ] \
+        || [ -e "$HOME/.claude/skills/ponytail/skill.md" ] \
+        || [ -d "$HOME/.claude/plugins/cache/ponytail" ] \
+        || [ -d "$HOME/.codex/plugins/cache/ponytail" ] \
+        || [ -d "$HOME/.codex/skills/ponytail" ] \
+        || [ -e "$HOME/.cursor/skills/ponytail/SKILL.md" ] \
+        || [ -d "$HOME/.agents/skills/ponytail" ] \
+        || [ -d ".agents/skills/ponytail" ] \
+        || [ -d "$HOME/.gemini/extensions/ponytail" ] \
+        || [ -d "$HOME/.pi/agent/git/github.com/DietrichGebert/ponytail" ]
+    }
+
+    # Portable skill tree → ~/.agents/skills (Grok, Cursor, generic skill hosts).
+    # Host plugins (Claude/Codex/pi) add hooks/commands; this keeps the skill readable everywhere.
+    install_ponytail_skill_files() {
+      local dest_root="$1"
+      local skill name url
+      [ -n "$dest_root" ] || return 1
+      for skill in ponytail ponytail-review ponytail-audit ponytail-debt ponytail-gain ponytail-help; do
+        mkdir -p "$dest_root/$skill" || return 1
+        url="https://raw.githubusercontent.com/DietrichGebert/ponytail/main/skills/$skill/SKILL.md"
+        if ! curl -fsSL "$url" -o "$dest_root/$skill/SKILL.md"; then
+          fail "ponytail: failed to fetch $skill/SKILL.md"
+          return 1
+        fi
+      done
+      return 0
+    }
+
+    if ponytail_marker; then
+      ok "ponytail skill markers present"
+    else
+      log "installing ponytail (DietrichGebert/ponytail) ..."
+      _ponytail_any=0
+
+      # Claude Code plugin (marketplace + install)
+      if command -v claude >/dev/null 2>&1; then
+        if claude plugin marketplace add DietrichGebert/ponytail 2>/dev/null \
+          || claude plugin marketplace list 2>/dev/null | grep -qi ponytail; then
+          if claude plugin install ponytail@ponytail -s user 2>/dev/null \
+            || claude plugin install ponytail@ponytail 2>/dev/null; then
+            ok "ponytail: claude plugin installed"
+            _ponytail_any=1
+          else
+            skip "ponytail: claude plugin install failed (marketplace may need interactive trust)"
+          fi
+        else
+          skip "ponytail: claude marketplace add failed"
+        fi
+      fi
+
+      # Codex plugin
+      if command -v codex >/dev/null 2>&1; then
+        if codex plugin marketplace add DietrichGebert/ponytail 2>/dev/null \
+          || codex plugin marketplace list 2>/dev/null | grep -qi ponytail; then
+          if codex plugin add ponytail@ponytail 2>/dev/null \
+            || codex plugin add ponytail --marketplace ponytail 2>/dev/null; then
+            ok "ponytail: codex plugin installed"
+            _ponytail_any=1
+          else
+            skip "ponytail: codex plugin add failed"
+          fi
+        else
+          skip "ponytail: codex marketplace add failed"
+        fi
+      fi
+
+      # pi package extension (needs npm for git installs; shim with bun when missing)
+      if command -v pi >/dev/null 2>&1; then
+        _ponytail_pi_shim=""
+        if ! command -v npm >/dev/null 2>&1 && command -v bun >/dev/null 2>&1; then
+          _ponytail_pi_shim=$(mktemp -d "${TMPDIR:-/tmp}/ponytail-pi.XXXXXX")
+          # pi's git install runs `npm install`; bun is npm-compatible enough here.
+          printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_ponytail_pi_shim/npm"
+          chmod +x "$_ponytail_pi_shim/npm"
+          export PATH="$_ponytail_pi_shim:$PATH"
+        fi
+        if pi install git:github.com/DietrichGebert/ponytail 2>/dev/null \
+          || pi install https://github.com/DietrichGebert/ponytail 2>/dev/null \
+          || pi install npm:@dietrichgebert/ponytail 2>/dev/null; then
+          ok "ponytail: pi package installed"
+          _ponytail_any=1
+        else
+          skip "ponytail: pi install failed (needs npm or bun shim; portable skills still work)"
+        fi
+        if [ -n "$_ponytail_pi_shim" ]; then
+          rm -rf "$_ponytail_pi_shim"
+        fi
+      fi
+
+      # skills CLI (global) — same bun→node shims as caveman when Node missing
+      _ponytail_node_shim=""
+      if { ! command -v node >/dev/null 2>&1 || ! command -v npx >/dev/null 2>&1; } \
+        && command -v bun >/dev/null 2>&1; then
+        _ponytail_node_shim=$(mktemp -d "${TMPDIR:-/tmp}/ponytail-node.XXXXXX")
+        if ! command -v node >/dev/null 2>&1; then
+          printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_ponytail_node_shim/node"
+          chmod +x "$_ponytail_node_shim/node"
+        fi
+        if ! command -v npx >/dev/null 2>&1; then
+          printf '%s\n' '#!/bin/sh' 'exec bun x "$@"' >"$_ponytail_node_shim/npx"
+          chmod +x "$_ponytail_node_shim/npx"
+        fi
+        export PATH="$_ponytail_node_shim:$PATH"
+      fi
+      if command -v npx >/dev/null 2>&1; then
+        if npx --yes skills add DietrichGebert/ponytail -g --all 2>/dev/null; then
+          ok "ponytail: skills CLI global install"
+          _ponytail_any=1
+        else
+          skip "ponytail: skills CLI install failed"
+        fi
+      fi
+      if [ -n "$_ponytail_node_shim" ]; then
+        rm -rf "$_ponytail_node_shim"
+      fi
+
+      # Always seed portable skill files under ~/.agents/skills (and project if present)
+      mkdir -p "$HOME/.agents/skills"
+      if install_ponytail_skill_files "$HOME/.agents/skills"; then
+        ok "ponytail: skill files in ~/.agents/skills"
+        _ponytail_any=1
+      fi
+      if [ -d ".agents/skills" ] || [ -d ".agents" ]; then
+        mkdir -p ".agents/skills"
+        if install_ponytail_skill_files ".agents/skills"; then
+          ok "ponytail: skill files in .agents/skills"
+          _ponytail_any=1
+        fi
+      fi
+
+      if [ "$_ponytail_any" -eq 1 ]; then
+        if ponytail_marker; then
+          ok "ponytail installed"
+        else
+          ok "ponytail install finished (open agent and /ponytail)"
+        fi
+      else
+        fail "ponytail install failed — see https://github.com/DietrichGebert/ponytail#install"
       fi
     fi
 
