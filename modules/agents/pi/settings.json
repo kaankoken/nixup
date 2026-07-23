@@ -5,10 +5,13 @@
   "packages": [
     "npm:@quintinshaw/pi-dynamic-workflows",
     "npm:pi-mcp-adapter",
+    "git:github.com/DietrichGebert/ponytail",
     "git:github.com/pasky/chrome-cdp-skill"
   ],
   "skills": [
     "~/.agents/skills",
+    "!~/.agents/skills/ponytail",
+    "!~/.agents/skills/ponytail-*",
     "~/.pi/agent/skills"
   ],
   "extensions": [

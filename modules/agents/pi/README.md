@@ -40,18 +40,16 @@ Live Pi home layout:
 |---------|------|
 | **`@quintinshaw/pi-dynamic-workflows`** | Spawn/orchestration runtime |
 | **`pi-mcp-adapter`** | MCP client for tokensave/headroom/context-mode/context7 |
+| **`git:github.com/DietrichGebert/ponytail`** | Ponytail skills for Pi (`pi install git:…/ponytail`) |
 | **`git:…/chrome-cdp-skill`** | Optional CDP for `web-browse-scout` |
-
-**Ponytail** is *not* a pi package — portable skills live under `~/.agents/skills` (avoids name collisions with package + project copies).
 
 ## Skills paths (deduped)
 
-Pi should load **only**:
+1. `~/.agents/skills` — portable skills (superpowers, android, …)  
+2. `!~/.agents/skills/ponytail` / `ponytail-*` — exclude portable copies so **package** ponytail wins  
+3. `~/.pi/agent/skills` — harness-only (`goal-harness`)
 
-1. `~/.agents/skills` — shared portable skills (superpowers, ponytail, android, …)
-2. `~/.pi/agent/skills` — harness-only (`goal-harness`)
-
-Do **not** also list `~/.claude/skills` or Claude plugin caches — that multiplies every skill and floods startup with collision warnings. Project `.agents/skills` still wins over user when present (normal Pi precedence).
+Do **not** list `~/.claude/skills` or Claude plugin caches (collision flood). Project `.agents/skills` may still override package when present (Pi project > package).
 
 Also required on PATH: `rtk`, `bd`, `tokensave`, `sg`/`ast-grep`, `headroom`, `context-mode`, `browser-use`.
 

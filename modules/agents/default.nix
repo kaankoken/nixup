@@ -571,6 +571,13 @@ PY
       else
         fail "pi MCP adapter install failed — try pi install npm:pi-mcp-adapter"
       fi
+      # Ponytail for Pi is the official package (not only portable ~/.agents/skills copies)
+      if pi install git:github.com/DietrichGebert/ponytail 2>/dev/null \
+        || pi install https://github.com/DietrichGebert/ponytail 2>/dev/null; then
+        ok "ponytail pi package installed (git:github.com/DietrichGebert/ponytail)"
+      else
+        skip "ponytail pi package install failed — pi install git:github.com/DietrichGebert/ponytail"
+      fi
       # Web tiers: CDP/headless (optional browser path for web-browse-scout)
       if pi install git:github.com/pasky/chrome-cdp-skill 2>/dev/null \
         || pi install https://github.com/pasky/chrome-cdp-skill 2>/dev/null; then
@@ -622,18 +629,11 @@ if not isinstance(packages, list):
 wanted = [
     "npm:@quintinshaw/pi-dynamic-workflows",
     "npm:pi-mcp-adapter",
+    "git:github.com/DietrichGebert/ponytail",
     "git:github.com/pasky/chrome-cdp-skill",
 ]
-# Portable ponytail under ~/.agents/skills — do not also load pi package copy (skill collisions)
-ponytail_portable = (home / ".agents" / "skills" / "ponytail" / "SKILL.md").is_file()
-filtered = []
-for p in packages:
-    s = str(p.get("source", p) if isinstance(p, dict) else p)
-    if ponytail_portable and "ponytail" in s.lower():
-        print("drop package (portable ponytail skills present):", s)
-        continue
-    filtered.append(p)
-packages = filtered
+# Ponytail for Pi is the git package (pi install git:github.com/DietrichGebert/ponytail).
+# Keep it; do not strip even if portable ~/.agents/skills copies exist for other agents.
 for src in wanted:
     if not any(
         (isinstance(p, str) and src in p)
@@ -642,12 +642,15 @@ for src in wanted:
     ):
         packages.append(src)
 data["packages"] = packages
-# Skills: single canonical tree + pi harness skills only.
-# Do NOT also load ~/.claude/skills or plugin caches — duplicates cause startup collisions.
-skills = ["~/.agents/skills", "~/.pi/agent/skills"]
-# Prefer harness file list if it is already the deduped set
+# Skills: portable tree + harness skills. Exclude portable ponytail* when pi package
+# provides ponytail (avoids triple collision with package + ~/.agents + project).
+skills = [
+    "~/.agents/skills",
+    "!~/.agents/skills/ponytail",
+    "!~/.agents/skills/ponytail-*",
+    "~/.pi/agent/skills",
+]
 if isinstance(harness.get("skills"), list) and harness["skills"]:
-    # Only allow known-safe roots (no ~/.claude/*)
     safe = []
     for s in harness["skills"]:
         ss = str(s)
@@ -661,6 +664,11 @@ if isinstance(harness.get("skills"), list) and harness["skills"]:
         skills = safe
     if "~/.agents/skills" not in skills:
         skills.insert(0, "~/.agents/skills")
+    # Always exclude portable ponytail dirs when package is installed
+    if any("ponytail" in str(p).lower() for p in packages):
+        for ex in ("!~/.agents/skills/ponytail", "!~/.agents/skills/ponytail-*"):
+            if ex not in skills:
+                skills.append(ex)
     if "~/.pi/agent/skills" not in skills and str(agent / "skills") not in skills:
         skills.append("~/.pi/agent/skills")
 data["skills"] = skills
