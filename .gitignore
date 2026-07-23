@@ -45,3 +45,6 @@ result-*
 # Local planning notes (never commit)
 /todo.md
 /spec.md
+
+# Agent skill dumps from installers (caveman, skills.sh, …)
+.agents/
