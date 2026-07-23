@@ -1327,40 +1327,68 @@ in
   ];
 
   # Pi goal harness templates (modules/agents/pi/) → ~/.pi/agent and workflow templates.
-  # settings.json is NOT force-overwritten: ship settings.harness.json for activation merge (Task 8).
+  # settings.json is NOT force-overwritten: ship settings.harness.json for activation merge.
   # Never manage ~/.pi/agent/auth.json.
+  # force=true: allow re-apply after manual copies / prior activation staged regular files.
   home.file = {
-    ".pi/agent/AGENTS.md".source = ./pi/AGENTS.global.md;
+    ".pi/agent/AGENTS.md" = {
+      source = ./pi/AGENTS.global.md;
+      force = true;
+    };
     # mcp.json written by activation (absolute binary paths) — not home.file
-    ".pi/agent/mcp.harness.json".source = ./pi/mcp.json;
-    ".pi/agent/extensions/sandbox.json".source = ./pi/sandbox.json;
-    ".pi/agent/models-aliases.json".source = ./pi/models-aliases.json;
-    ".pi/agent/settings.harness.json".source = ./pi/settings.json;
-    ".pi/agent/agent-types.json".source = ./pi/agent-types.json;
-    ".pi/agent/README-harness.md".source = ./pi/README.md;
+    ".pi/agent/mcp.harness.json" = {
+      source = ./pi/mcp.json;
+      force = true;
+    };
+    ".pi/agent/extensions/sandbox.json" = {
+      source = ./pi/sandbox.json;
+      force = true;
+    };
+    ".pi/agent/models-aliases.json" = {
+      source = ./pi/models-aliases.json;
+      force = true;
+    };
+    ".pi/agent/settings.harness.json" = {
+      source = ./pi/settings.json;
+      force = true;
+    };
+    ".pi/agent/agent-types.json" = {
+      source = ./pi/agent-types.json;
+      force = true;
+    };
+    ".pi/agent/README-harness.md" = {
+      source = ./pi/README.md;
+      force = true;
+    };
     ".pi/agent/docs" = {
       source = ./pi/docs;
       recursive = true;
+      force = true;
     };
     ".pi/agent/agents" = {
       source = ./pi/agents;
       recursive = true;
+      force = true;
     };
     ".pi/agent/prompts" = {
       source = ./pi/prompts;
       recursive = true;
+      force = true;
     };
     ".pi/agent/skills/goal-harness" = {
       source = ./pi/skills/goal-harness;
       recursive = true;
+      force = true;
     };
     ".pi/agent/templates/project" = {
       source = ./pi/templates/project;
       recursive = true;
+      force = true;
     };
     ".pi/workflows/templates" = {
       source = ./pi/workflows;
       recursive = true;
+      force = true;
     };
   };
 
