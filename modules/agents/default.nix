@@ -8,14 +8,18 @@ let
   # Fail-soft installer helpers run during home-manager activation.
   # Official channels change — keep commands documented and soft.
   #
-  # No system Node/npm for agent runtimes we control: pi installs via bun only.
+  # Shared stack (see AGENTS.md): RTK, beads, headroom, tokensave, caveman,
+  # context-mode, context7, ast-grep (Nix). Code graph = tokensave only
+  # (codebase-memory is stripped on activate).
+  #
+  # No system Node/npm for agent runtimes we control: pi / context-mode via bun.
   # codex / rtk / grok / claude / beads / caveman: official curl|sh installers.
   # codex must NEVER use wrap_bun_cli — that made Codex think it was npm-managed
   # and could write-through-symlink clobber ~/.codex/packages/standalone/.../bin/codex.
   # Prefer ~/.local/bin so GUI / minimal-PATH agent shells still find tools.
   installScript = pkgs.writeShellScript "install-agent-tools" ''
     set +e
-    export PATH="$HOME/.local/bin:${pkgs.bun}/bin:${pkgs.uv}/bin:${pkgs.curl}/bin:${pkgs.bash}/bin:$HOME/.bun/bin:$HOME/.cargo/bin:/opt/zerobrew/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+    export PATH="$HOME/.local/bin:${pkgs.bun}/bin:${pkgs.uv}/bin:${pkgs.curl}/bin:${pkgs.bash}/bin:${pkgs.python3}/bin:$HOME/.bun/bin:$HOME/.cargo/bin:/opt/zerobrew/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
     log() { echo "[agents] $*"; }
     ok()  { log "OK: $*"; }
@@ -430,23 +434,105 @@ let
       fi
     fi
 
-    # --- caveman (multi-agent skill; not a PATH CLI) ---
+    # --- RTK multi-agent hooks (binary already ensured above) ---
+    # https://github.com/rtk-ai/rtk
+    if command -v rtk >/dev/null 2>&1; then
+      log "rtk init for claude / codex / cursor / pi (auto-patch where supported)..."
+      rtk init -g --auto-patch 2>/dev/null && ok "rtk init claude" || fail "rtk init claude"
+      rtk init -g --codex 2>/dev/null && ok "rtk init codex" || fail "rtk init codex"
+      rtk init -g --agent cursor --auto-patch 2>/dev/null && ok "rtk init cursor" || fail "rtk init cursor"
+      rtk init -g --agent pi --auto-patch 2>/dev/null && ok "rtk init pi" || fail "rtk init pi"
+    else
+      fail "rtk missing — cannot run rtk init"
+    fi
+
+    # --- tokensave (sole code graph; never codebase-memory) ---
+    # https://github.com/aovestdipaperino/tokensave
+    if ! command -v tokensave >/dev/null 2>&1; then
+      log "installing tokensave binary..."
+      if command -v brew >/dev/null 2>&1 && brew install aovestdipaperino/tap/tokensave 2>/dev/null; then
+        ok "tokensave via brew"
+      elif command -v cargo >/dev/null 2>&1 && cargo install tokensave --locked 2>/dev/null; then
+        export PATH="$HOME/.cargo/bin:$PATH"
+        ensure_local_native_bin tokensave "$(command -v tokensave)" || true
+        ok "tokensave via cargo"
+      else
+        fail "tokensave install failed — brew install aovestdipaperino/tap/tokensave"
+      fi
+    else
+      ok "tokensave present ($(tokensave --version 2>/dev/null | head -1 || echo ok))"
+    fi
+    if command -v tokensave >/dev/null 2>&1; then
+      for agent in claude codex cursor pi grok; do
+        if tokensave install --agent "$agent" --git-hook no 2>/dev/null; then
+          ok "tokensave install --agent $agent"
+        else
+          fail "tokensave install --agent $agent"
+        fi
+      done
+    fi
+
+    # --- context-mode (bun; Node ≥22.5 alternative) ---
+    # https://github.com/mksglu/context-mode
+    if command -v context-mode >/dev/null 2>&1; then
+      ok "context-mode present ($(context-mode --version 2>/dev/null | head -1 || echo ok))"
+    else
+      require_bun || true
+      if command -v bun >/dev/null 2>&1; then
+        log "installing context-mode via bun..."
+        if bun install -g context-mode 2>/dev/null; then
+          # Prefer a ~/.local/bin entry for agent MCP configs
+          if [ -e "$HOME/.bun/bin/context-mode" ]; then
+            wrap_bun_cli context-mode || ln -sfn "$HOME/.bun/bin/context-mode" "$HOME/.local/bin/context-mode"
+          fi
+          export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
+          if command -v context-mode >/dev/null 2>&1; then
+            ok "context-mode installed"
+          else
+            fail "context-mode bun install finished but binary not on PATH"
+          fi
+        else
+          fail "context-mode bun install failed"
+        fi
+      else
+        fail "context-mode skipped — bun missing"
+      fi
+    fi
+
+    # --- caveman (multi-agent skill; bun/node for installer) ---
     # https://github.com/JuliusBrussee/caveman
-    # Installer needs Node ≥18; safe to re-run. No system Node in this flake — soft-fail.
     caveman_marker() {
       [ -e "$HOME/.claude/skills/caveman/SKILL.md" ] \
         || [ -e "$HOME/.claude/skills/caveman/skill.md" ] \
+        || [ -d "$HOME/.claude/plugins/cache/caveman" ] \
         || [ -d "$HOME/.codex/skills/caveman" ] \
         || [ -d "$HOME/.gemini/extensions/caveman" ] \
         || [ -e "$HOME/.cursor/skills/caveman/SKILL.md" ] \
-        || [ -d "$HOME/.agents/skills/caveman" ]
+        || [ -d "$HOME/.agents/skills/caveman" ] \
+        || [ -d ".agents/skills/caveman" ]
     }
     if caveman_marker; then
       ok "caveman skill markers present"
     else
       log "installing caveman via https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh ..."
-      if command -v node >/dev/null 2>&1 || command -v bun >/dev/null 2>&1; then
-        # Prefer real node if present; otherwise try with bun on PATH (install may still need node).
+      # Official installer requires `node` + `npx` ≥18. This flake has no system
+      # Node — session-local shims exec bun / bun x (user-approved).
+      _caveman_node_shim=""
+      if { ! command -v node >/dev/null 2>&1 || ! command -v npx >/dev/null 2>&1; } \
+        && command -v bun >/dev/null 2>&1; then
+        _caveman_node_shim=$(mktemp -d "${TMPDIR:-/tmp}/caveman-node.XXXXXX")
+        if ! command -v node >/dev/null 2>&1; then
+          printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_caveman_node_shim/node"
+          chmod +x "$_caveman_node_shim/node"
+        fi
+        if ! command -v npx >/dev/null 2>&1; then
+          printf '%s\n' '#!/bin/sh' 'exec bun x "$@"' >"$_caveman_node_shim/npx"
+          chmod +x "$_caveman_node_shim/npx"
+        fi
+        export PATH="$_caveman_node_shim:$PATH"
+        log "using bun shims for node/npx under $_caveman_node_shim"
+      fi
+      if command -v node >/dev/null 2>&1 && command -v npx >/dev/null 2>&1; then
         if curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash; then
           if caveman_marker; then
             ok "caveman installed"
@@ -454,26 +540,206 @@ let
             ok "caveman install script finished (markers not detected — open an agent and /caveman)"
           fi
         else
-          fail "caveman install failed — needs Node ≥18: curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash"
+          fail "caveman install failed — curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash"
         fi
       else
-        fail "caveman skipped — Node ≥18 required by installer (not provided by this flake)"
+        fail "caveman skipped — bun or Node ≥18 (+ npx) required"
+      fi
+      if [ -n "$_caveman_node_shim" ]; then
+        rm -rf "$_caveman_node_shim"
       fi
     fi
+
+    # --- beads multi-agent setup (binary already ensured above) ---
+    if command -v bd >/dev/null 2>&1; then
+      for setup_target in claude codex cursor; do
+        if bd setup "$setup_target" 2>/dev/null; then
+          ok "bd setup $setup_target"
+        else
+          skip "bd setup $setup_target (optional / project-local)"
+        fi
+      done
+    fi
+
+    # --- purge codebase-memory + wire shared MCP (context7: no API key) ---
+    log "purging codebase-memory MCP entries; ensuring headroom/tokensave/context-mode/context7..."
+    python3 - <<'PY' || fail "MCP config reconcile failed"
+import json, os, re, shutil
+from pathlib import Path
+
+home = Path.home()
+local_bin = home / ".local" / "bin"
+
+def which(name):
+    for d in [local_bin, home / ".bun" / "bin", home / ".cargo" / "bin",
+              Path("/opt/homebrew/bin"), Path("/usr/local/bin")]:
+        p = d / name
+        if p.is_file() or p.is_symlink():
+            return str(p)
+    for d in os.environ.get("PATH", "").split(":"):
+        if not d:
+            continue
+        p = Path(d) / name
+        if p.is_file() or p.is_symlink():
+            return str(p)
+    return None
+
+tokensave = which("tokensave") or str(local_bin / "tokensave")
+headroom = which("headroom") or str(local_bin / "headroom")
+ctx_mode = which("context-mode")
+bun = which("bun")
+
+def drop_cm(d):
+    changed = False
+    for k in list(d.keys()):
+        if "codebase-memory" in k.lower():
+            del d[k]
+            changed = True
+    return changed
+
+def merge_mcp_json(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = {}
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text())
+        except Exception:
+            data = {}
+    if not isinstance(data, dict):
+        data = {}
+    key = "mcpServers"
+    if "servers" in data and "mcpServers" not in data:
+        key = "servers"
+    servers = data.setdefault(key, {})
+    if not isinstance(servers, dict):
+        servers = {}
+        data[key] = servers
+    changed = drop_cm(servers)
+    desired = {}
+    if which("tokensave"):
+        desired["tokensave"] = {"command": tokensave, "args": ["serve"]}
+    if which("headroom"):
+        desired["headroom"] = {"command": headroom, "args": ["mcp", "serve"]}
+    if ctx_mode:
+        desired["context-mode"] = {"command": ctx_mode}
+    # context7 free tier — no API key
+    desired["context7"] = {"url": "https://mcp.context7.com/mcp"}
+    for name, spec in desired.items():
+        if servers.get(name) != spec:
+            servers[name] = spec
+            changed = True
+    if changed or not path.is_file():
+        path.write_text(json.dumps(data, indent=2) + "\n")
+        print("updated", path)
+
+merge_mcp_json(home / ".claude" / ".mcp.json")
+merge_mcp_json(home / ".cursor" / "mcp.json")
+
+for claude_json in [home / ".claude" / ".claude.json", home / ".claude.json"]:
+    if not claude_json.is_file():
+        continue
+    try:
+        data = json.loads(claude_json.read_text())
+        touched = False
+        if isinstance(data.get("mcpServers"), dict):
+            if drop_cm(data["mcpServers"]):
+                touched = True
+            desired = {
+                "tokensave": {"command": tokensave, "args": ["serve"]},
+                "headroom": {"command": headroom, "args": ["mcp", "serve"]},
+                "context7": {"url": "https://mcp.context7.com/mcp"},
+            }
+            if ctx_mode:
+                desired["context-mode"] = {"command": ctx_mode}
+            for name, spec in desired.items():
+                if data["mcpServers"].get(name) != spec:
+                    data["mcpServers"][name] = spec
+                    touched = True
+        projects = data.get("projects")
+        if isinstance(projects, dict):
+            for proj in projects.values():
+                if isinstance(proj, dict) and isinstance(proj.get("mcpServers"), dict):
+                    if drop_cm(proj["mcpServers"]):
+                        touched = True
+        if touched:
+            bak = Path(str(claude_json) + ".bak-nix-setup")
+            if not bak.exists():
+                shutil.copy2(claude_json, bak)
+            claude_json.write_text(json.dumps(data, indent=2) + "\n")
+            print("updated", claude_json)
+    except Exception as e:
+        print("skip", claude_json, e)
+
+def patch_toml(path, is_grok=False):
+    if not path.is_file():
+        return
+    text = path.read_text()
+    original = text
+    text = re.sub(
+        r"\n\[mcp_servers\.codebase-memory-mcp\][^\[]*",
+        "\n",
+        text,
+        flags=re.MULTILINE,
+    )
+    text = text.replace(
+        "prefer codebase-memory-mcp (search_graph, trace_path, get_code_snippet, query_graph, search_code) over grep/file-read; run index_repository first if the project is not indexed.",
+        "prefer tokensave (tokensave_context, tokensave_search, callers/impact) over grep/file-read and Explore agents; run tokensave init/sync if the project is not indexed. Do not use codebase-memory.",
+    )
+    blocks = []
+    if which("tokensave") and "[mcp_servers.tokensave]" not in text:
+        blocks.append(
+            f'[mcp_servers.tokensave]\ncommand = {json.dumps(tokensave)}\nargs = ["serve"]\n'
+        )
+    if which("headroom") and "[mcp_servers.headroom]" not in text:
+        blocks.append(
+            f'[mcp_servers.headroom]\ncommand = {json.dumps(headroom)}\nargs = ["mcp", "serve"]\n'
+        )
+    if ctx_mode and "[mcp_servers.context-mode]" not in text:
+        blocks.append(f'[mcp_servers.context-mode]\ncommand = {json.dumps(ctx_mode)}\n')
+    if "[mcp_servers.context7]" not in text:
+        if is_grok:
+            blocks.append('[mcp_servers.context7]\nurl = "https://mcp.context7.com/mcp"\n')
+        elif bun:
+            blocks.append(
+                f'[mcp_servers.context7]\ncommand = {json.dumps(bun)}\n'
+                f'args = ["x", "-y", "@upstash/context7-mcp"]\n'
+            )
+        else:
+            blocks.append(
+                '[mcp_servers.context7]\ncommand = "npx"\n'
+                'args = ["-y", "@upstash/context7-mcp"]\n'
+            )
+    if blocks:
+        if not text.endswith("\n"):
+            text += "\n"
+        text += "\n" + "\n".join(blocks)
+    if text != original:
+        bak = path.with_suffix(path.suffix + ".bak-nix-setup")
+        if not bak.exists():
+            shutil.copy2(path, bak)
+        path.write_text(text)
+        print("updated", path)
+
+patch_toml(home / ".codex" / "config.toml", is_grok=False)
+patch_toml(home / ".grok" / "config.toml", is_grok=True)
+print("MCP reconcile done")
+PY
 
     exit 0
   '';
 in
 {
   home.packages = with pkgs; [
-    # uv / bun / curl for agent installers (bun replaces node/npm)
+    # uv / bun / curl / python for agent installers (bun replaces node/npm)
     uv
     bun
     curl
+    python3
   ];
 
   home.activation.installAgentTools = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    echo "=== agent tools activation (fail-soft; codex/rtk curl standalone, pi via bun) ==="
+    echo "=== agent tools activation (fail-soft; shared stack: rtk/tokensave/headroom/context-mode/context7/caveman) ==="
     ${installScript} || echo "[agents] activation script exited non-zero (ignored)"
   '';
 }
+
