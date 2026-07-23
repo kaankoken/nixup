@@ -298,40 +298,102 @@ let
     fi
 
     # --- npm shim (bun) for pi package manager when real npm is absent ---
-    # Pi's package-manager spawns `npm install`; without Node we provide bun-as-npm.
+    # Pi spawns `npm install PKG --prefix ~/.pi/agent/npm`. Plain `bun "$@"` also mutates
+    # CWD package.json (pollutes ~/package.json / .dotfiles with duplicate pi-extensions).
+    # This Python shim: honor --prefix by chdir+bun add there; never write home package.json.
     mkdir -p "$HOME/.local/bin"
-    if ! command -v npm >/dev/null 2>&1 || grep -Fq 'Managed by nix-setup' "$HOME/.local/bin/npm" 2>/dev/null; then
-      if command -v bun >/dev/null 2>&1; then
-        # Write npm→bun shim without Nix interpolating shell ''${...}
-        printf '%s\n' \
-          '#!/bin/sh' \
-          '# Managed by nix-setup modules/agents — npm shim for pi package installs (bun as npm).' \
-          'if [ "''${NODE_USE_REAL_NPM:-}" = "1" ]; then' \
-          '  for c in /opt/homebrew/bin/npm /usr/local/bin/npm; do' \
-          '    if [ -x "$c" ]; then exec "$c" "$@"; fi' \
-          '  done' \
-          'fi' \
-          'exec bun "$@"' \
-          >"$HOME/.local/bin/npm"
+    if command -v bun >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+      if ! command -v npm >/dev/null 2>&1 \
+        || grep -Fq 'Managed by nix-setup modules/agents' "$HOME/.local/bin/npm" 2>/dev/null \
+        || grep -Fq 'isolate --prefix installs' "$HOME/.local/bin/npm" 2>/dev/null; then
+        cat >"$HOME/.local/bin/npm" <<'NPMSHIM'
+#!/usr/bin/env python3
+"""Managed by nix-setup modules/agents — bun-as-npm for pi; isolate --prefix installs."""
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    prefix: str | None = None
+    filtered: list[str] = []
+    i = 0
+    while i < len(args):
+        if args[i] == "--prefix" and i + 1 < len(args):
+            prefix = args[i + 1]
+            i += 2
+            continue
+        if args[i] == "--legacy-peer-deps":
+            i += 1
+            continue
+        filtered.append(args[i])
+        i += 1
+
+    bun = "bun"
+    env = os.environ.copy()
+    local_bin = os.path.expanduser("~/.local/bin")
+    bun_bin = os.path.expanduser("~/.bun/bin")
+    env["PATH"] = os.pathsep.join(
+        [local_bin, bun_bin] + env.get("PATH", "").split(os.pathsep)
+    )
+
+    if prefix:
+        os.makedirs(prefix, exist_ok=True)
+        if filtered and filtered[0] == "install":
+            pkgs = [a for a in filtered[1:] if not a.startswith("-")]
+            flags = [a for a in filtered[1:] if a.startswith("-")]
+            cmd = [bun, "add", *pkgs, *flags] if pkgs else [bun, "install", *flags]
+        else:
+            cmd = [bun, *filtered]
+        return subprocess.call(cmd, cwd=prefix, env=env)
+
+    home = os.path.expanduser("~")
+    cwd = os.getcwd()
+    home_pkg = os.path.join(home, "package.json")
+    cwd_pkg = os.path.join(cwd, "package.json")
+    try:
+        same_as_home = (
+            os.path.exists(cwd_pkg)
+            and os.path.exists(home_pkg)
+            and os.path.samefile(cwd_pkg, home_pkg)
+        )
+    except OSError:
+        same_as_home = False
+    if cwd == home or same_as_home:
+        run_dir = os.path.join(home, ".pi", "agent", "run")
+        os.makedirs(run_dir, exist_ok=True)
+        run_pkg = os.path.join(run_dir, "package.json")
+        if not os.path.isfile(run_pkg):
+            with open(run_pkg, "w", encoding="utf-8") as handle:
+                handle.write('{\n  "name": "pi-agent-run",\n  "private": true\n}\n')
+        cwd = run_dir
+    return subprocess.call([bun, *filtered], cwd=cwd, env=env)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+NPMSHIM
         chmod +x "$HOME/.local/bin/npm"
         export PATH="$HOME/.local/bin:$PATH"
-        ok "npm shim → bun at ~/.local/bin/npm (for pi packages)"
+        ok "npm shim → bun (prefix-isolated) at ~/.local/bin/npm"
       else
-        skip "npm shim skipped — bun missing"
+        ok "npm present ($(command -v npm))"
       fi
     else
-      ok "npm present ($(command -v npm))"
+      skip "npm shim skipped — need bun + python3"
     fi
 
-    # Pi `list`/`install` may pollute ~/package.json with duplicate pi-extensions keys.
-    # Strip those junk keys from resolved package.json (often ~/.dotfiles/package.json).
+    # Repair pollution from older pi/bun runs (duplicate pi-extensions in home package.json).
     python3 - <<'PY' || true
 import json
 from pathlib import Path
+
 home = Path.home()
-candidates = [home / "package.json", home / ".dotfiles" / "package.json"]
-for path in candidates:
-    if not path.is_file() and not path.is_symlink():
+for path in (home / "package.json", home / ".dotfiles" / "package.json"):
+    if not path.exists():
         continue
     try:
         real = path.resolve()
@@ -339,9 +401,7 @@ for path in candidates:
     except Exception:
         continue
     deps = data.get("dependencies")
-    if not isinstance(deps, dict):
-        continue
-    if "pi-extensions" not in deps:
+    if not isinstance(deps, dict) or "pi-extensions" not in deps:
         continue
     del deps["pi-extensions"]
     data["dependencies"] = deps
