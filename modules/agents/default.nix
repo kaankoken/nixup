@@ -100,11 +100,11 @@ let
         return 0
       fi
       head=$(head -n 5 "$resolved" 2>/dev/null || true)
-      case "$head" in
-        *'#!/usr/bin/env node'*|*'#!/usr/bin/env bun'*|*node_modules/@openai/codex*|*exec bun*)
-          return 0
-          ;;
-      esac
+      # Do not put #!/… inside a case pattern — bash treats # as comment mid-arm
+      # (breaks with "syntax error near unexpected token `bun*'").
+      if printf '%s\n' "$head" | grep -Eq '#!/usr/bin/env (node|bun)|node_modules/@openai/codex|exec[[:space:]]+bun'; then
+        return 0
+      fi
       case "$resolved" in
         */.bun/bin/*|*/node_modules/@openai/codex/*|*/node_modules/.bin/*)
           return 0
@@ -474,20 +474,25 @@ let
 
     # --- context-mode (bun; Node ≥22.5 alternative) ---
     # https://github.com/mksglu/context-mode
-    if command -v context-mode >/dev/null 2>&1; then
-      ok "context-mode present ($(context-mode --version 2>/dev/null | head -1 || echo ok))"
+    # NEVER run `context-mode --version` here: it starts an interactive/TUI path
+    # and hangs activation (no TTY progress, looks "stuck" after tokensave install).
+    if command -v context-mode >/dev/null 2>&1 || [ -e "$HOME/.bun/bin/context-mode" ]; then
+      if [ -e "$HOME/.bun/bin/context-mode" ] && [ ! -e "$HOME/.local/bin/context-mode" ]; then
+        wrap_bun_cli context-mode || ln -sfn "$HOME/.bun/bin/context-mode" "$HOME/.local/bin/context-mode"
+      fi
+      export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
+      ok "context-mode present ($(command -v context-mode))"
     else
       require_bun || true
       if command -v bun >/dev/null 2>&1; then
         log "installing context-mode via bun..."
         if bun install -g context-mode 2>/dev/null; then
-          # Prefer a ~/.local/bin entry for agent MCP configs
           if [ -e "$HOME/.bun/bin/context-mode" ]; then
             wrap_bun_cli context-mode || ln -sfn "$HOME/.bun/bin/context-mode" "$HOME/.local/bin/context-mode"
           fi
           export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
           if command -v context-mode >/dev/null 2>&1; then
-            ok "context-mode installed"
+            ok "context-mode installed ($(command -v context-mode))"
           else
             fail "context-mode bun install finished but binary not on PATH"
           fi
