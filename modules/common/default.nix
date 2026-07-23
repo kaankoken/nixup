@@ -43,6 +43,7 @@ in
   # nixpkgs.config.allowUnfree: set on darwin module / Linux pkgs import (useGlobalPkgs)
   #
   # rtk / codex / caveman: official curl installers in modules/agents (not Nix).
+  # codex is standalone only — agents purges legacy bun/npm wrappers on activate.
   # headroom: uv tool install in modules/agents (not Nix).
   # rustc/cargo: rustup activation; bacon + cargo-nextest from Nix.
   # JS CLIs still on bun: pi only — do not add nodejs/npm to this flake.

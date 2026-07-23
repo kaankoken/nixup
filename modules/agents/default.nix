@@ -8,12 +8,14 @@ let
   # Fail-soft installer helpers run during home-manager activation.
   # Official channels change — keep commands documented and soft.
   #
-  # No system Node/npm for agent runtimes we control: pi installs via bun.
+  # No system Node/npm for agent runtimes we control: pi installs via bun only.
   # codex / rtk / grok / claude / beads / caveman: official curl|sh installers.
-  # Wrappers in ~/.local/bin for bun CLIs: exec bun ~/.bun/bin/<name> …
+  # codex must NEVER use wrap_bun_cli — that made Codex think it was npm-managed
+  # and could write-through-symlink clobber ~/.codex/packages/standalone/.../bin/codex.
+  # Prefer ~/.local/bin so GUI / minimal-PATH agent shells still find tools.
   installScript = pkgs.writeShellScript "install-agent-tools" ''
     set +e
-    export PATH="${pkgs.bun}/bin:${pkgs.uv}/bin:${pkgs.curl}/bin:${pkgs.bash}/bin:$HOME/.local/bin:$HOME/.bun/bin:$HOME/.cargo/bin:$PATH"
+    export PATH="$HOME/.local/bin:${pkgs.bun}/bin:${pkgs.uv}/bin:${pkgs.curl}/bin:${pkgs.bash}/bin:$HOME/.bun/bin:$HOME/.cargo/bin:/opt/zerobrew/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
     log() { echo "[agents] $*"; }
     ok()  { log "OK: $*"; }
@@ -28,8 +30,121 @@ let
       return 1
     }
 
+    # Resolve symlinks without depending on GNU readlink -f (macOS).
+    resolve_path() {
+      local path="$1"
+      local dir base target
+      [ -e "$path" ] || { printf '%s\n' "$path"; return 0; }
+      if command -v realpath >/dev/null 2>&1; then
+        realpath "$path" 2>/dev/null && return 0
+      fi
+      if command -v python3 >/dev/null 2>&1; then
+        python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$path" 2>/dev/null && return 0
+      fi
+      # Best-effort: one-level symlink follow.
+      if [ -L "$path" ]; then
+        target=$(readlink "$path" 2>/dev/null || true)
+        case "$target" in
+          /*) printf '%s\n' "$target" ;;
+          *)
+            dir=$(dirname "$path")
+            printf '%s\n' "$dir/$target"
+            ;;
+        esac
+        return 0
+      fi
+      printf '%s\n' "$path"
+    }
+
+    # True if path is a real native CLI binary (Mach-O / ELF), not a shell/node wrapper.
+    is_native_cli() {
+      local path="$1"
+      local resolved kind
+      [ -n "$path" ] || return 1
+      [ -e "$path" ] || return 1
+      [ -d "$path" ] && return 1
+      resolved=$(resolve_path "$path")
+      [ -x "$resolved" ] || [ -x "$path" ] || return 1
+      kind=$(file -b "$resolved" 2>/dev/null || file -b "$path" 2>/dev/null || true)
+      case "$kind" in
+        *Mach-O*|*ELF*|*executable*)
+          # Reject obvious script/text even if file says executable.
+          case "$kind" in
+            *script*|*text*|*ASCII*|*UTF-8*) return 1 ;;
+          esac
+          return 0
+          ;;
+      esac
+      return 1
+    }
+
+    # True if this is a leftover package-manager / nix-setup bun wrapper for a CLI.
+    is_legacy_pm_wrapper() {
+      local path="$1"
+      local resolved head
+      [ -n "$path" ] || return 1
+      [ -e "$path" ] || return 1
+      resolved=$(resolve_path "$path")
+      if is_native_cli "$resolved"; then
+        return 1
+      fi
+      # Our own historical wrapper (see wrap_bun_cli).
+      if grep -Fq 'Managed by nix-setup modules/agents' "$resolved" 2>/dev/null; then
+        return 0
+      fi
+      if grep -Eq 'exec[[:space:]]+bun[[:space:]]+' "$resolved" 2>/dev/null; then
+        return 0
+      fi
+      head=$(head -n 5 "$resolved" 2>/dev/null || true)
+      case "$head" in
+        *'#!/usr/bin/env node'*|*'#!/usr/bin/env bun'*|*node_modules/@openai/codex*|*exec bun*)
+          return 0
+          ;;
+      esac
+      case "$resolved" in
+        */.bun/bin/*|*/node_modules/@openai/codex/*|*/node_modules/.bin/*)
+          return 0
+          ;;
+      esac
+      # Shell/node script that is not a native binary — treat as package-manager entry.
+      case "$(file -b "$resolved" 2>/dev/null || true)" in
+        *script*|*text*)
+          if grep -Eqi 'bun |/bun|node_modules|@openai/codex|npm install' "$resolved" 2>/dev/null; then
+            return 0
+          fi
+          ;;
+      esac
+      return 1
+    }
+
+    # Ensure ~/.local/bin/<name> is a native binary (or symlink to one).
+    # Prefer existing good local bin; else symlink from $source; else fail.
+    ensure_local_native_bin() {
+      local bin_name="$1"
+      local source="$2"
+      local dest="$HOME/.local/bin/$bin_name"
+      mkdir -p "$HOME/.local/bin"
+      if is_native_cli "$dest"; then
+        return 0
+      fi
+      if [ -e "$dest" ] && is_legacy_pm_wrapper "$dest"; then
+        log "removing legacy wrapper $dest"
+        rm -f "$dest"
+      fi
+      if [ -n "$source" ] && is_native_cli "$source"; then
+        # Always replace with a symlink we own (never write through old links).
+        rm -f "$dest"
+        ln -sfn "$(resolve_path "$source")" "$dest"
+        chmod +x "$dest" 2>/dev/null || true
+        log "linked $dest -> $(resolve_path "$source")"
+        return 0
+      fi
+      return 1
+    }
+
     # Global bun package + ~/.local/bin wrapper that runs the entry under bun
     # (packages ship #!/usr/bin/env node; we never put Node on PATH).
+    # ONLY for pi (and similar pure-JS CLIs) — never codex/rtk/bd.
     install_bun_cli() {
       local package="$1"
       local bin_name="$2"
@@ -70,6 +185,88 @@ let
       return 0
     }
 
+    # --- codex helpers (standalone only; never bun/npm) ---
+    codex_standalone_entrypoint() {
+      local root current
+      root="$HOME/.codex/packages/standalone"
+      current="$root/current"
+      if [ -x "$current/codex" ]; then
+        printf '%s\n' "$current/codex"
+        return 0
+      fi
+      if [ -x "$current/bin/codex" ]; then
+        printf '%s\n' "$current/bin/codex"
+        return 0
+      fi
+      return 1
+    }
+
+    codex_standalone_ok() {
+      local entry
+      entry=$(codex_standalone_entrypoint 2>/dev/null) || return 1
+      # Standalone entry may be a tiny launcher script in some layouts; accept
+      # native binary, or a non-pm script living under packages/standalone that
+      # is not our bun wrapper.
+      if is_native_cli "$entry"; then
+        return 0
+      fi
+      if is_legacy_pm_wrapper "$entry"; then
+        return 1
+      fi
+      # Non-wrapper script under standalone (official launcher) — require it runs.
+      if [ -x "$entry" ] && "$entry" --version >/dev/null 2>&1; then
+        case "$(resolve_path "$entry")" in
+          */.codex/packages/standalone/*) return 0 ;;
+        esac
+      fi
+      return 1
+    }
+
+    purge_legacy_codex_wrappers() {
+      local p
+      for p in \
+        "$HOME/.local/bin/codex" \
+        "$HOME/.bun/bin/codex"
+      do
+        if [ -e "$p" ] && is_legacy_pm_wrapper "$p"; then
+          log "removing legacy codex wrapper: $p"
+          rm -f "$p"
+        fi
+      done
+      # If standalone entry itself was clobbered by write-through-symlink, drop it
+      # so the official installer can replace the release cleanly.
+      p=$(codex_standalone_entrypoint 2>/dev/null || true)
+      if [ -n "$p" ] && is_legacy_pm_wrapper "$p"; then
+        log "standalone entry clobbered by legacy wrapper — removing $p"
+        rm -f "$p"
+      fi
+    }
+
+    link_local_codex_to_standalone() {
+      local entry dest
+      entry=$(codex_standalone_entrypoint) || return 1
+      dest="$HOME/.local/bin/codex"
+      mkdir -p "$HOME/.local/bin"
+      # Never write through an existing symlink into the package tree.
+      rm -f "$dest"
+      ln -sfn "$entry" "$dest"
+      export PATH="$HOME/.local/bin:$PATH"
+      log "linked $dest -> $entry"
+      return 0
+    }
+
+    install_or_repair_codex() {
+      log "installing/repairing codex via https://chatgpt.com/codex/install.sh ..."
+      # Prefer non-interactive when the installer supports it.
+      if CODEX_NON_INTERACTIVE=1 curl -fsSL https://chatgpt.com/codex/install.sh | sh; then
+        return 0
+      fi
+      if curl -fsSL https://chatgpt.com/codex/install.sh | sh; then
+        return 0
+      fi
+      return 1
+    }
+
     # --- rustup (prefer official; do not install nixpkgs rustc) ---
     if command -v rustup >/dev/null 2>&1; then
       ok "rustup already present ($(rustup --version 2>/dev/null | head -1))"
@@ -107,15 +304,29 @@ let
       fi
     fi
 
-    # --- codex CLI (official installer; not bun) ---
+    # --- codex CLI (official standalone installer ONLY; never bun/npm) ---
     # https://chatgpt.com/codex/install.sh
-    if command -v codex >/dev/null 2>&1; then
-      ok "codex present ($(codex --version 2>/dev/null | head -1 || echo ok))"
+    # Healthy = native/standalone under ~/.codex/packages/standalone + ~/.local/bin/codex
+    # pointing at it. Legacy bun wrappers make Codex report CODEX_MANAGED_BY_NPM.
+    purge_legacy_codex_wrappers
+    export PATH="$HOME/.local/bin:$PATH"
+    if codex_standalone_ok && link_local_codex_to_standalone; then
+      ok "codex standalone present ($(codex --version 2>/dev/null | head -1 || echo ok))"
     else
-      log "installing codex via https://chatgpt.com/codex/install.sh ..."
-      if curl -fsSL https://chatgpt.com/codex/install.sh | sh; then
-        export PATH="$HOME/.local/bin:$PATH"
-        ok "codex install attempted ($(codex --version 2>/dev/null | head -1 || echo ok))"
+      if install_or_repair_codex; then
+        purge_legacy_codex_wrappers
+        if codex_standalone_ok && link_local_codex_to_standalone; then
+          ok "codex repaired ($(codex --version 2>/dev/null | head -1 || echo ok))"
+        elif command -v codex >/dev/null 2>&1 && ! is_legacy_pm_wrapper "$(command -v codex)"; then
+          # Installer put a non-wrapper binary on PATH even if layout differs.
+          if [ ! -e "$HOME/.local/bin/codex" ] || is_legacy_pm_wrapper "$HOME/.local/bin/codex"; then
+            ensure_local_native_bin codex "$(command -v codex)" || true
+          fi
+          export PATH="$HOME/.local/bin:$PATH"
+          ok "codex install attempted ($(codex --version 2>/dev/null | head -1 || echo ok))"
+        else
+          fail "codex install finished but no healthy standalone entry found"
+        fi
       else
         fail "codex install failed — curl -fsSL https://chatgpt.com/codex/install.sh | sh (desktop app still manual)"
       fi
@@ -179,17 +390,43 @@ let
       fi
     fi
 
-    # --- rtk (official installer; not zerobrew) ---
+    # --- rtk (official installer → ~/.local/bin; not zerobrew-only) ---
     # https://github.com/rtk-ai/rtk
-    if command -v rtk >/dev/null 2>&1; then
-      ok "rtk present ($(rtk --version 2>/dev/null | head -1 || echo ok))"
+    # Agent shells (Codex desktop, minimal PATH) often miss /opt/zerobrew and
+    # /opt/homebrew. Always ensure a native rtk at ~/.local/bin/rtk.
+    rtk_src=""
+    if is_native_cli "$HOME/.local/bin/rtk"; then
+      rtk_src="$HOME/.local/bin/rtk"
+    elif command -v rtk >/dev/null 2>&1 && is_native_cli "$(command -v rtk)"; then
+      rtk_src=$(command -v rtk)
+    fi
+    if [ -n "$rtk_src" ] && ensure_local_native_bin rtk "$rtk_src"; then
+      export PATH="$HOME/.local/bin:$PATH"
+      ok "rtk present at ~/.local/bin ($(rtk --version 2>/dev/null | head -1 || echo ok))"
     else
-      log "installing rtk via official install.sh..."
+      log "installing rtk via official install.sh into ~/.local/bin ..."
       if curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh; then
         export PATH="$HOME/.local/bin:$PATH"
-        ok "rtk install attempted ($(rtk --version 2>/dev/null | head -1 || echo ok))"
+        if is_native_cli "$HOME/.local/bin/rtk"; then
+          ok "rtk installed ($(rtk --version 2>/dev/null | head -1 || echo ok))"
+        elif command -v rtk >/dev/null 2>&1 && ensure_local_native_bin rtk "$(command -v rtk)"; then
+          ok "rtk linked to ~/.local/bin ($(rtk --version 2>/dev/null | head -1 || echo ok))"
+        else
+          fail "rtk install finished but ~/.local/bin/rtk missing"
+        fi
       else
-        fail "rtk install failed — curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh"
+        # Last resort: symlink from known package managers if install.sh failed.
+        for candidate in /opt/zerobrew/bin/rtk /opt/homebrew/bin/rtk /usr/local/bin/rtk; do
+          if is_native_cli "$candidate" && ensure_local_native_bin rtk "$candidate"; then
+            export PATH="$HOME/.local/bin:$PATH"
+            ok "rtk linked from $candidate ($(rtk --version 2>/dev/null | head -1 || echo ok))"
+            candidate=""
+            break
+          fi
+        done
+        if ! is_native_cli "$HOME/.local/bin/rtk"; then
+          fail "rtk install failed — curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh"
+        fi
       fi
     fi
 
@@ -236,7 +473,7 @@ in
   ];
 
   home.activation.installAgentTools = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    echo "=== agent tools activation (fail-soft; bun not node) ==="
+    echo "=== agent tools activation (fail-soft; codex/rtk curl standalone, pi via bun) ==="
     ${installScript} || echo "[agents] activation script exited non-zero (ignored)"
   '';
 }
