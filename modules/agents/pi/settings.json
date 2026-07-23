@@ -1,0 +1,39 @@
+{
+  "theme": "dark",
+  "quietStartup": true,
+  "enableSkillCommands": true,
+  "packages": [
+    "npm:@quintinshaw/pi-dynamic-workflows",
+    "npm:pi-mcp-adapter",
+    "git:github.com/DietrichGebert/ponytail",
+    "git:github.com/pasky/chrome-cdp-skill"
+  ],
+  "skills": [
+    "~/.agents/skills",
+    "!~/.agents/skills/ponytail",
+    "!~/.agents/skills/ponytail-*",
+    "~/.pi/agent/skills"
+  ],
+  "extensions": [
+    "extensions/rtk.ts"
+  ],
+  "defaultProvider": "openai",
+  "defaultModel": "gpt-5.6-sol",
+  "defaultThinkingLevel": "high",
+  "grokEffort": "high",
+  "enabledModels": [
+    "openai/gpt-5.6-sol",
+    "openai/gpt-5.6-sol:ultra",
+    "openai/gpt-5.6-sol:high",
+    "openai/gpt-5.6-sol:low",
+    "anthropic/claude-fable-5",
+    "anthropic/claude-fable-5:max",
+    "anthropic/claude-opus-4-8",
+    "anthropic/claude-opus-4-8:high",
+    "xai/grok-4.5:high"
+  ],
+  "compaction": {
+    "enabled": true,
+    "keepRecentTokens": 20000
+  }
+}

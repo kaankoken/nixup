@@ -1,0 +1,24 @@
+# {{SUBDIR}}
+
+Scope: **{{SCOPE}}**
+
+Nested agent instructions. Inherits root CLI contract (rtk, bd, tokensave, sg, headroom, context-mode, context7, caveman, ponytail). This file only narrows what agents should touch here.
+
+## In scope
+
+- Work under `{{SUBDIR}}/` and its children unless the user expands scope.
+- Prefer tokensave / `sg` / `rtk rg` before thrashing the whole repo.
+- Keep changes wired (no stubs); track work in **bd**.
+
+## Out of scope
+
+- Unrelated packages/crates/modules outside this tree without explicit ask.
+- Parallel tool stacks or codebase-memory.
+
+## CLAUDE.md
+
+Sibling `CLAUDE.md` must be a symlink to this file:
+
+```bash
+ln -sfn AGENTS.md CLAUDE.md
+```

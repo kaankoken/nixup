@@ -9,6 +9,7 @@ let
   # Official channels change — keep commands documented and soft.
   #
   # Shared stack (see AGENTS.md): RTK, beads, headroom, tokensave, caveman,
+  # browser-use (uv tool; Chrome CDP), webwright optional (long-horizon Playwright),
   # ponytail, context-mode, context7, ast-grep (Nix). Code graph = tokensave only
   # (codebase-memory is stripped on activate).
   #
@@ -296,6 +297,188 @@ let
       fi
     fi
 
+    # --- npm shim (bun) for pi package manager when real npm is absent ---
+    # Pi spawns `npm install PKG --prefix ~/.pi/agent/npm`. Plain `bun "$@"` also mutates
+    # CWD package.json (pollutes ~/package.json / .dotfiles with duplicate pi-extensions).
+    # This Python shim: honor --prefix by chdir+bun add there; never write home package.json.
+    mkdir -p "$HOME/.local/bin"
+    if command -v bun >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+      if ! command -v npm >/dev/null 2>&1 \
+        || grep -Fq 'Managed by nix-setup modules/agents' "$HOME/.local/bin/npm" 2>/dev/null \
+        || grep -Fq 'isolate --prefix installs' "$HOME/.local/bin/npm" 2>/dev/null; then
+        cat >"$HOME/.local/bin/npm" <<'NPMSHIM'
+#!/usr/bin/env python3
+"""Managed by nix-setup modules/agents — bun-as-npm for pi; isolate --prefix installs."""
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    prefix: str | None = None
+    filtered: list[str] = []
+    i = 0
+    while i < len(args):
+        if args[i] == "--prefix" and i + 1 < len(args):
+            prefix = args[i + 1]
+            i += 2
+            continue
+        if args[i] == "--legacy-peer-deps":
+            i += 1
+            continue
+        filtered.append(args[i])
+        i += 1
+
+    bun = "bun"
+    env = os.environ.copy()
+    local_bin = os.path.expanduser("~/.local/bin")
+    bun_bin = os.path.expanduser("~/.bun/bin")
+    env["PATH"] = os.pathsep.join(
+        [local_bin, bun_bin] + env.get("PATH", "").split(os.pathsep)
+    )
+
+    if prefix:
+        os.makedirs(prefix, exist_ok=True)
+        if filtered and filtered[0] == "install":
+            pkgs = [a for a in filtered[1:] if not a.startswith("-")]
+            flags = [a for a in filtered[1:] if a.startswith("-")]
+            cmd = [bun, "add", *pkgs, *flags] if pkgs else [bun, "install", *flags]
+        else:
+            cmd = [bun, *filtered]
+        return subprocess.call(cmd, cwd=prefix, env=env)
+
+    home = os.path.expanduser("~")
+    cwd = os.getcwd()
+    home_pkg = os.path.join(home, "package.json")
+    cwd_pkg = os.path.join(cwd, "package.json")
+    try:
+        same_as_home = (
+            os.path.exists(cwd_pkg)
+            and os.path.exists(home_pkg)
+            and os.path.samefile(cwd_pkg, home_pkg)
+        )
+    except OSError:
+        same_as_home = False
+    if cwd == home or same_as_home:
+        run_dir = os.path.join(home, ".pi", "agent", "run")
+        os.makedirs(run_dir, exist_ok=True)
+        run_pkg = os.path.join(run_dir, "package.json")
+        if not os.path.isfile(run_pkg):
+            with open(run_pkg, "w", encoding="utf-8") as handle:
+                handle.write('{\n  "name": "pi-agent-run",\n  "private": true\n}\n')
+        cwd = run_dir
+    return subprocess.call([bun, *filtered], cwd=cwd, env=env)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+NPMSHIM
+        chmod +x "$HOME/.local/bin/npm"
+        export PATH="$HOME/.local/bin:$PATH"
+        ok "npm shim → bun (prefix-isolated) at ~/.local/bin/npm"
+      else
+        ok "npm present ($(command -v npm))"
+      fi
+    else
+      skip "npm shim skipped — need bun + python3"
+    fi
+
+    # Repair pollution from older pi/bun runs (duplicate pi-extensions in home package.json).
+    python3 - <<'PY' || true
+import json
+from pathlib import Path
+
+home = Path.home()
+for path in (home / "package.json", home / ".dotfiles" / "package.json"):
+    if not path.exists():
+        continue
+    try:
+        real = path.resolve()
+        data = json.loads(real.read_text())
+    except Exception:
+        continue
+    deps = data.get("dependencies")
+    if not isinstance(deps, dict) or "pi-extensions" not in deps:
+        continue
+    del deps["pi-extensions"]
+    data["dependencies"] = deps
+    real.write_text(json.dumps(data, indent=2) + "\n")
+    print("stripped pi-extensions from", real)
+for lock in (home / "bun.lock", home / ".dotfiles" / "bun.lock"):
+    if lock.is_file():
+        try:
+            lock.unlink()
+            print("removed", lock)
+        except Exception:
+            pass
+PY
+
+    # --- browser-use (uv tool → ~/.local/bin; attaches to running Chrome via CDP) ---
+    # https://github.com/browser-use/browser-use — no separate Chromium required if Chrome exists.
+    # Multi-device: always ensure CLI on this host so activation syncs the stack.
+    if command -v browser-use >/dev/null 2>&1 || [ -x "$HOME/.local/bin/browser-use" ]; then
+      export PATH="$HOME/.local/bin:$PATH"
+      ok "browser-use present ($(browser-use --version 2>/dev/null | head -1 || echo ok))"
+    else
+      log "installing browser-use via uv tool..."
+      if command -v uv >/dev/null 2>&1 && uv tool install browser-use; then
+        export PATH="$HOME/.local/bin:$PATH"
+        if command -v browser-use >/dev/null 2>&1 || [ -x "$HOME/.local/bin/browser-use" ]; then
+          ok "browser-use installed ($(browser-use --version 2>/dev/null | head -1 || echo ok))"
+        else
+          fail "browser-use uv install finished but binary not on PATH"
+        fi
+      else
+        fail "browser-use install failed — uv tool install browser-use"
+      fi
+    fi
+    # Soft: ensure shims live under ~/.local/bin for agent PATH
+    if [ -x "$HOME/.local/bin/browser-use" ]; then
+      export PATH="$HOME/.local/bin:$PATH"
+    fi
+
+    # --- webwright (optional tier-4 long-horizon Playwright code-as-action) ---
+    # https://github.com/microsoft/Webwright — soft-fail; skill for Pi/Claude/Codex.
+    # Prefer skill symlink for agents; full CLI install best-effort.
+    webwright_skill_dst="$HOME/.agents/skills/webwright"
+    if [ -f "$webwright_skill_dst/SKILL.md" ]; then
+      ok "webwright skill present at $webwright_skill_dst"
+    else
+      log "installing webwright skill (microsoft/Webwright) for multi-agent discovery..."
+      mkdir -p "$HOME/.agents/skills" "$HOME/.cache/nix-setup"
+      if [ ! -d "$HOME/.cache/nix-setup/Webwright/.git" ]; then
+        git clone --depth 1 https://github.com/microsoft/Webwright.git \
+          "$HOME/.cache/nix-setup/Webwright" 2>/dev/null \
+          || fail "webwright git clone failed"
+      else
+        git -C "$HOME/.cache/nix-setup/Webwright" pull --ff-only 2>/dev/null || true
+      fi
+      if [ -d "$HOME/.cache/nix-setup/Webwright/skills/webwright" ]; then
+        rm -rf "$webwright_skill_dst"
+        ln -sfn "$HOME/.cache/nix-setup/Webwright/skills/webwright" "$webwright_skill_dst"
+        ok "webwright skill linked → $webwright_skill_dst"
+      else
+        skip "webwright skill tree missing after clone"
+      fi
+    fi
+    if command -v webwright >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1; then
+      if command -v webwright >/dev/null 2>&1; then
+        ok "webwright CLI present"
+      elif command -v uv >/dev/null 2>&1 \
+        && [ -d "$HOME/.cache/nix-setup/Webwright" ]; then
+        # Best-effort editable/tool install for CLI; soft-fail (Playwright chromium optional)
+        if uv tool install --from "$HOME/.cache/nix-setup/Webwright" webwright 2>/dev/null \
+          || (cd "$HOME/.cache/nix-setup/Webwright" && uv pip install -e . 2>/dev/null); then
+          ok "webwright package install attempted"
+        else
+          skip "webwright CLI install soft-failed (skill still usable by host agents)"
+        fi
+      fi
+    fi
+
     # --- claude-code (official native installer when available) ---
     if command -v claude >/dev/null 2>&1; then
       ok "claude present"
@@ -361,6 +544,259 @@ let
       else
         fail "pi install failed — bun install -g @earendil-works/pi-coding-agent"
       fi
+    fi
+
+    # --- pi goal harness: packages, settings merge, workflow templates, model tiers ---
+    # Templates from home.file: ~/.pi/agent/settings.harness.json, agents/, prompts/, skills/,
+    # ~/.pi/workflows/templates/. Never touch auth.json.
+    if command -v pi >/dev/null 2>&1; then
+      log "pi harness: installing dynamic-workflows + MCP adapter (fail-soft)..."
+      _pi_harness_shim=""
+      if ! command -v npm >/dev/null 2>&1 && command -v bun >/dev/null 2>&1; then
+        _pi_harness_shim=$(mktemp -d "${TMPDIR:-/tmp}/pi-harness-npm.XXXXXX")
+        printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_pi_harness_shim/npm"
+        chmod +x "$_pi_harness_shim/npm"
+        export PATH="$_pi_harness_shim:$PATH"
+      fi
+      if pi install npm:@quintinshaw/pi-dynamic-workflows 2>/dev/null \
+        || pi install npm:@quintinshaw/pi-dynamic-workflows@latest 2>/dev/null; then
+        ok "pi-dynamic-workflows installed"
+      else
+        fail "pi-dynamic-workflows install failed — pi install npm:@quintinshaw/pi-dynamic-workflows"
+      fi
+      if pi install npm:pi-mcp-adapter 2>/dev/null \
+        || pi install npm:@earendil-works/pi-mcp-adapter 2>/dev/null \
+        || pi install npm:pi-mcp-extension 2>/dev/null; then
+        ok "pi MCP adapter installed"
+      else
+        fail "pi MCP adapter install failed — try pi install npm:pi-mcp-adapter"
+      fi
+      # Ponytail for Pi is the official package (not only portable ~/.agents/skills copies)
+      if pi install git:github.com/DietrichGebert/ponytail 2>/dev/null \
+        || pi install https://github.com/DietrichGebert/ponytail 2>/dev/null; then
+        ok "ponytail pi package installed (git:github.com/DietrichGebert/ponytail)"
+      else
+        skip "ponytail pi package install failed — pi install git:github.com/DietrichGebert/ponytail"
+      fi
+      # Web tiers: CDP/headless (optional browser path for web-browse-scout)
+      if pi install git:github.com/pasky/chrome-cdp-skill 2>/dev/null \
+        || pi install https://github.com/pasky/chrome-cdp-skill 2>/dev/null; then
+        ok "pi chrome-cdp skill installed (web-browse-scout)"
+      else
+        skip "chrome-cdp skill — web-browse-scout soft-fails until installed"
+      fi
+      # browser-use / webwright installed earlier in activation (shared multi-device stack)
+      if command -v browser-use >/dev/null 2>&1 || [ -x "$HOME/.local/bin/browser-use" ]; then
+        ok "browser-use on PATH for pi harness (Chrome CDP — enable chrome://inspect/#remote-debugging if doctor fails)"
+      else
+        skip "browser-use missing for pi harness (see earlier install step)"
+      fi
+      if [ -f "$HOME/.agents/skills/webwright/SKILL.md" ]; then
+        ok "webwright skill available for pi (~/.agents/skills/webwright)"
+      else
+        skip "webwright skill not linked"
+      fi
+      if [ -n "$_pi_harness_shim" ]; then
+        rm -rf "$_pi_harness_shim"
+      fi
+
+      # Merge settings.harness.json → settings.json (preserve theme/lastChangelogVersion/rtk)
+      python3 - <<'PY' || fail "pi settings merge failed"
+import json
+from pathlib import Path
+home = Path.home()
+agent = home / ".pi" / "agent"
+settings_path = agent / "settings.json"
+harness_path = agent / "settings.harness.json"
+data = {}
+if settings_path.is_file():
+    try:
+        data = json.loads(settings_path.read_text())
+    except Exception:
+        data = {}
+if not isinstance(data, dict):
+    data = {}
+harness = {}
+if harness_path.is_file():
+    try:
+        harness = json.loads(harness_path.read_text())
+    except Exception:
+        harness = {}
+# packages: ensure required sources present; drop ponytail git pkg if portable skills exist
+packages = data.get("packages")
+if not isinstance(packages, list):
+    packages = []
+wanted = [
+    "npm:@quintinshaw/pi-dynamic-workflows",
+    "npm:pi-mcp-adapter",
+    "git:github.com/DietrichGebert/ponytail",
+    "git:github.com/pasky/chrome-cdp-skill",
+]
+# Ponytail for Pi is the git package (pi install git:github.com/DietrichGebert/ponytail).
+# Keep it; do not strip even if portable ~/.agents/skills copies exist for other agents.
+for src in wanted:
+    if not any(
+        (isinstance(p, str) and src in p)
+        or (isinstance(p, dict) and src in str(p.get("source", "")))
+        for p in packages
+    ):
+        packages.append(src)
+data["packages"] = packages
+# Skills: portable tree + harness skills. Exclude portable ponytail* when pi package
+# provides ponytail (avoids triple collision with package + ~/.agents + project).
+skills = [
+    "~/.agents/skills",
+    "!~/.agents/skills/ponytail",
+    "!~/.agents/skills/ponytail-*",
+    "~/.pi/agent/skills",
+]
+if isinstance(harness.get("skills"), list) and harness["skills"]:
+    safe = []
+    for s in harness["skills"]:
+        ss = str(s)
+        if ".claude" in ss and "plugins/cache" in ss:
+            continue
+        if ss.endswith("/.claude/skills") or "/.claude/skills" in ss:
+            continue
+        if ss not in safe:
+            safe.append(ss)
+    if safe:
+        skills = safe
+    if "~/.agents/skills" not in skills:
+        skills.insert(0, "~/.agents/skills")
+    # Always exclude portable ponytail dirs when package is installed
+    if any("ponytail" in str(p).lower() for p in packages):
+        for ex in ("!~/.agents/skills/ponytail", "!~/.agents/skills/ponytail-*"):
+            if ex not in skills:
+                skills.append(ex)
+    if "~/.pi/agent/skills" not in skills and str(agent / "skills") not in skills:
+        skills.append("~/.pi/agent/skills")
+data["skills"] = skills
+print("pi skills paths:", skills)
+# prompts + agents dirs (if settings supports)
+for key in ("enableSkillCommands", "defaultThinkingLevel", "quietStartup"):
+    if key in harness and key not in data:
+        data[key] = harness[key]
+if "compaction" in harness and "compaction" not in data:
+    data["compaction"] = harness["compaction"]
+# extensions: keep rtk; merge harness extensions
+ext = data.get("extensions")
+if not isinstance(ext, list):
+    ext = []
+for e in harness.get("extensions") or ["extensions/rtk.ts"]:
+    if e not in ext:
+        ext.append(e)
+data["extensions"] = ext
+agent.mkdir(parents=True, exist_ok=True)
+settings_path.write_text(json.dumps(data, indent=2) + "\n")
+print("merged", settings_path)
+PY
+      ok "pi settings.harness merged into settings.json"
+
+      # Deploy workflow templates + model-tiers (package may re-read later)
+      mkdir -p "$HOME/.pi/workflows/saved" "$HOME/.pi/workflows/templates"
+      if [ -d "$HOME/.pi/workflows/templates" ]; then
+        # home.file already places templates; also copy JS into saved-friendly names
+        for wf in goal-harness research-fanout milestone-review; do
+          if [ -f "$HOME/.pi/workflows/templates/''${wf}.js" ]; then
+            cp -f "$HOME/.pi/workflows/templates/''${wf}.js" "$HOME/.pi/workflows/saved/''${wf}.js" 2>/dev/null \
+              || cp -f "$HOME/.pi/workflows/templates/''${wf}.js" "$HOME/.pi/workflows/''${wf}.js" 2>/dev/null \
+              || true
+          fi
+        done
+        if [ -f "$HOME/.pi/workflows/templates/model-tiers.json" ]; then
+          if [ ! -f "$HOME/.pi/workflows/model-tiers.json" ]; then
+            cp -f "$HOME/.pi/workflows/templates/model-tiers.json" "$HOME/.pi/workflows/model-tiers.json" || true
+          fi
+        fi
+      fi
+      ok "pi workflow templates staged under ~/.pi/workflows"
+
+      # Soft model-tier resolve: only fill REPLACE_ME when a model catalog is visible
+      python3 - <<'PY' || true
+import json, re, subprocess
+from pathlib import Path
+home = Path.home()
+tiers_path = home / ".pi" / "workflows" / "model-tiers.json"
+aliases_path = home / ".pi" / "agent" / "models-aliases.json"
+if not tiers_path.is_file():
+    raise SystemExit(0)
+try:
+    document = json.loads(tiers_path.read_text())
+except Exception:
+    raise SystemExit(0)
+catalog = ""
+for command_argv in (
+    ["pi", "models", "--list"],
+    ["pi", "--list-models"],
+    ["pi", "list"],
+):
+    try:
+        process_result = subprocess.run(
+            command_argv, capture_output=True, text=True, timeout=15
+        )
+        catalog += (process_result.stdout or "") + "\n" + (process_result.stderr or "")
+    except Exception:
+        pass
+
+def pick_model(*needles):
+    for line in catalog.splitlines():
+        lowered = line.lower()
+        if all(needle in lowered for needle in needles):
+            match = re.search(r"([a-z0-9._-]+/[a-z0-9._:+-]+)", line, re.I)
+            if match:
+                return match.group(1).strip()
+            return line.strip()
+    return None
+
+resolved = {}
+# Prefer explicit harness defaults; only overwrite REPLACE_ME placeholders.
+defaults = {
+    "big": "openai/gpt-5.6-sol:ultra",
+    "medium": "xai/grok-4.5:high",  # Grok always high effort
+    "small": "openai/gpt-5.6-sol:low",
+}
+tier_map = document.get("tiers") if isinstance(document.get("tiers"), dict) else document
+if not isinstance(tier_map, dict):
+    print("model tiers: unexpected shape")
+    raise SystemExit(0)
+changed = False
+for key, default_id in defaults.items():
+    current = str(tier_map.get(key, ""))
+    if current.startswith("REPLACE_ME") or not current:
+        tier_map[key] = default_id
+        resolved[key] = default_id
+        changed = True
+# Soft upgrade from catalog if fuzzy match looks better (optional)
+for key, needles in (
+    ("big", ("gpt-5.6-sol", "sol")),
+    ("medium", ("grok-4.5", "grok")),
+    ("small", ("gpt-5.6-sol", "sol")),
+):
+    found = pick_model(*needles[:1]) or pick_model(needles[-1])
+    if found and key in defaults:
+        # keep effort suffix from defaults when catalog omits it
+        if ":" not in found and ":" in defaults[key]:
+            found = found + ":" + defaults[key].split(":")[-1]
+        if found != tier_map.get(key):
+            # only replace if still default/placeholder
+            if str(tier_map.get(key, "")).startswith("REPLACE_ME"):
+                tier_map[key] = found
+                resolved[key] = found
+                changed = True
+if "tiers" in document:
+    document["tiers"] = tier_map
+else:
+    document = {"tiers": tier_map}
+if changed:
+    tiers_path.write_text(json.dumps(document, indent=2) + "\n")
+    print("model tiers set:", tier_map)
+else:
+    print("model tiers unchanged:", tier_map)
+PY
+      ok "pi model-tier resolve attempted (soft)"
+    else
+      skip "pi harness packages — pi not on PATH"
     fi
 
     # --- beads (official native binary; do NOT use bun/npm @beads/bd or crates.io) ---
@@ -785,6 +1221,8 @@ def merge_mcp_json(path):
 
 merge_mcp_json(home / ".claude" / ".mcp.json")
 merge_mcp_json(home / ".cursor" / "mcp.json")
+# Pi goal harness MCP (absolute commands preferred)
+merge_mcp_json(home / ".pi" / "agent" / "mcp.json")
 
 for claude_json in [home / ".claude" / ".claude.json", home / ".claude.json"]:
     if not claude_json.is_file():
@@ -887,6 +1325,72 @@ in
     curl
     python3
   ];
+
+  # Pi goal harness templates (modules/agents/pi/) → ~/.pi/agent and workflow templates.
+  # settings.json is NOT force-overwritten: ship settings.harness.json for activation merge.
+  # Never manage ~/.pi/agent/auth.json.
+  # force=true: allow re-apply after manual copies / prior activation staged regular files.
+  home.file = {
+    ".pi/agent/AGENTS.md" = {
+      source = ./pi/AGENTS.global.md;
+      force = true;
+    };
+    # mcp.json written by activation (absolute binary paths) — not home.file
+    ".pi/agent/mcp.harness.json" = {
+      source = ./pi/mcp.json;
+      force = true;
+    };
+    ".pi/agent/extensions/sandbox.json" = {
+      source = ./pi/sandbox.json;
+      force = true;
+    };
+    ".pi/agent/models-aliases.json" = {
+      source = ./pi/models-aliases.json;
+      force = true;
+    };
+    ".pi/agent/settings.harness.json" = {
+      source = ./pi/settings.json;
+      force = true;
+    };
+    ".pi/agent/agent-types.json" = {
+      source = ./pi/agent-types.json;
+      force = true;
+    };
+    ".pi/agent/README-harness.md" = {
+      source = ./pi/README.md;
+      force = true;
+    };
+    ".pi/agent/docs" = {
+      source = ./pi/docs;
+      recursive = true;
+      force = true;
+    };
+    ".pi/agent/agents" = {
+      source = ./pi/agents;
+      recursive = true;
+      force = true;
+    };
+    ".pi/agent/prompts" = {
+      source = ./pi/prompts;
+      recursive = true;
+      force = true;
+    };
+    ".pi/agent/skills/goal-harness" = {
+      source = ./pi/skills/goal-harness;
+      recursive = true;
+      force = true;
+    };
+    ".pi/agent/templates/project" = {
+      source = ./pi/templates/project;
+      recursive = true;
+      force = true;
+    };
+    ".pi/workflows/templates" = {
+      source = ./pi/workflows;
+      recursive = true;
+      force = true;
+    };
+  };
 
   home.activation.installAgentTools = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     echo "=== agent tools activation (fail-soft; shared stack: rtk/tokensave/headroom/context-mode/context7/caveman) ==="

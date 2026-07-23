@@ -184,3 +184,26 @@ headroom wrap codex
 ```
 
 Do not configure a second “primary” code-intelligence MCP alongside tokensave.
+
+## Browser / web (shared stack)
+
+| Tier | Tool | Install |
+|------|------|---------|
+| Search+fetch | agents / curl | always |
+| CDP short | chrome-cdp (soft) | pi install |
+| Heavy live | **browser-use** | `modules/agents` → `uv tool install browser-use` |
+| Long-horizon | **Webwright** skill | `~/.agents/skills/webwright` (activation clone) |
+
+Chrome remote debugging for browser-use: `chrome://inspect/#remote-debugging`.
+
+## Pi goal harness
+
+Pi uses the **same** stack above — not a parallel toolkit. Templates and roles live under [`modules/agents/pi/`](modules/agents/pi/) and deploy to `~/.pi/agent/` (never `auth.json`).
+
+| Entry | Behavior |
+|-------|----------|
+| `/goal [text]` | Full multi-model harness (superpowers + **pi-dynamic-workflows** + bd) |
+| `/harness [text]` | Alias of `/goal` |
+| `/init` | Project scaffold only (`project-init` + AGENTS templates) |
+
+Smoke after activation: `scripts/smoke-pi-harness.sh`. Design: `docs/superpowers/specs/2026-07-23-pi-goal-harness-design.md`. Child MCP caveat: `modules/agents/pi/docs/child-tools.md`.
