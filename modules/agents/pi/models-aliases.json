@@ -1,0 +1,107 @@
+{
+  "auth_notes": {
+    "anthropic": "Claude Code subscription (claude-fable-5, claude-opus-4-8)",
+    "openai": "GPT / OpenAI account (gpt-5.6-sol)",
+    "xai": "Grok account (grok-4.5)"
+  },
+  "review_pool": [
+    {
+      "alias": "gpt-sol-5.6",
+      "provider": "openai",
+      "id": "gpt-5.6-sol",
+      "pi": "openai/gpt-5.6-sol",
+      "effort": "ultra",
+      "piWithEffort": "openai/gpt-5.6-sol:ultra",
+      "priority": 1,
+      "notes": "Primary review / spec / plan / milestone; sol ultra via GPT account"
+    },
+    {
+      "alias": "fable-5",
+      "provider": "anthropic",
+      "id": "claude-fable-5",
+      "pi": "anthropic/claude-fable-5",
+      "effort": "max",
+      "piWithEffort": "anthropic/claude-fable-5:max",
+      "priority": 2,
+      "notes": "Anthropic Fable via Claude Code account; max effort"
+    },
+    {
+      "alias": "opus",
+      "provider": "anthropic",
+      "id": "claude-opus-4-8",
+      "pi": "anthropic/claude-opus-4-8",
+      "effort": "high",
+      "piWithEffort": "anthropic/claude-opus-4-8:high",
+      "priority": 3,
+      "notes": "Opus fallback via Claude Code account"
+    }
+  ],
+  "implement_pool": [
+    {
+      "alias": "grok-4.5",
+      "provider": "xai",
+      "id": "grok-4.5",
+      "pi": "xai/grok-4.5:high",
+      "effort": "high",
+      "effort_locked": true,
+      "piWithEffort": "xai/grok-4.5:high",
+      "priority": 1,
+      "notes": "Primary implement via Grok account. ALWAYS high effort — never call without :high."
+    },
+    {
+      "alias": "gpt-sol-5.6",
+      "provider": "openai",
+      "id": "gpt-5.6-sol",
+      "pi": "openai/gpt-5.6-sol",
+      "effort": "high",
+      "piWithEffort": "openai/gpt-5.6-sol:high",
+      "priority": 2,
+      "notes": "Implement fallback; sol high (not ultra)"
+    },
+    {
+      "alias": "opus",
+      "provider": "anthropic",
+      "id": "claude-opus-4-8",
+      "pi": "anthropic/claude-opus-4-8",
+      "effort": "high",
+      "piWithEffort": "anthropic/claude-opus-4-8:high",
+      "priority": 3,
+      "notes": "Implement pool third; Claude Code account"
+    }
+  ],
+  "scout_pool": [
+    {
+      "alias": "scout-small",
+      "provider": "openai",
+      "id": "gpt-5.6-sol",
+      "pi": "openai/gpt-5.6-sol",
+      "effort": "low",
+      "piWithEffort": "openai/gpt-5.6-sol:low",
+      "tier": "small",
+      "priority": 1,
+      "notes": "Cheap research scouts — sol low"
+    },
+    {
+      "alias": "scout-medium",
+      "provider": "openai",
+      "id": "gpt-5.6-sol",
+      "pi": "openai/gpt-5.6-sol",
+      "effort": "medium",
+      "piWithEffort": "openai/gpt-5.6-sol:medium",
+      "tier": "medium",
+      "priority": 2,
+      "notes": "code-graph / multi-file recon"
+    }
+  ],
+  "resolved": {
+    "review_primary": "openai/gpt-5.6-sol:ultra",
+    "review_secondary": "anthropic/claude-fable-5:max",
+    "review_tertiary": "anthropic/claude-opus-4-8:high",
+    "implement_primary": "xai/grok-4.5:high",
+    "implement_secondary": "openai/gpt-5.6-sol:high",
+    "implement_tertiary": "anthropic/claude-opus-4-8:high",
+    "big": "openai/gpt-5.6-sol:ultra",
+    "medium": "xai/grok-4.5:high",
+    "small": "openai/gpt-5.6-sol:low"
+  }
+}

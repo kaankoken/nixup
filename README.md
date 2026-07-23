@@ -85,10 +85,10 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 |---------|------|
 | **Nix** | CLI: nushell, starship, stow, neovim, **zellij** ([kaankoken/zellij](https://github.com/kaankoken/zellij) fork — kitty image protocol + yazi), **yazi**, atuin, lazygit, git UX (`difftastic`, `mergiraf`, `git-filter-repo`), modern CLIs (rg/fd/eza/…), Rust helpers (`bacon`, `cargo-nextest`; toolchain via rustup), **uv**, bun, zola, git, gh, cloudflared, fonts. **GUI (Darwin):** `ghostty-bin`, `zed-editor`, `signal-desktop`, `slack`, `whatsapp-for-mac` |
 | **Zerobrew → Homebrew fallback** (Mac) | **`mole`**: `zb install` then `brew install`. **`aerospace`**: `zb` then `brew install --cask nikitabobko/tap/aerospace`. Soft-fail if both fail |
-| **uv** | **headroom** — `uv tool install "headroom-ai[proxy,ml,code,mcp,evals]"` (modules/agents) |
+| **uv** | **headroom** — `uv tool install "headroom-ai[proxy,ml,code,mcp,evals]"`; **browser-use** — `uv tool install browser-use` (Chrome CDP; modules/agents). Soft: **webwright** skill clone → `~/.agents/skills/webwright` |
 | **Manual** | Microsoft Outlook, Codex desktop |
 | **Activation (curl)** | rustup, claude-code, **codex** (standalone via `chatgpt.com/codex/install.sh`; purges legacy bun/npm wrappers), **rtk** (→ `~/.local/bin`), **beads**, **grok**, **caveman** (skill installer; needs Node ≥18), **ponytail** (skill/plugin multi-path: Claude/Codex/pi + portable `~/.agents/skills`) |
-| **Activation (bun)** | **pi** only (`bun install -g`; wrappers in `~/.local/bin`) — **never codex** |
+| **Activation (bun)** | **pi** only (`bun install -g`; wrappers in `~/.local/bin`) — **never codex**. Pi goal harness also installs **`@quintinshaw/pi-dynamic-workflows`** + **`pi-mcp-adapter`** (fail-soft; see `modules/agents/pi/`) |
 
 ### Sources of truth
 
@@ -101,6 +101,8 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 | mole | zerobrew (`zb install mole`) — not Nix |
 | aerospace | zb if indexed; else **`brew install --cask nikitabobko/tap/aerospace`** |
 | headroom | **uv** only |
+| browser-use | **uv tool** (multi-device via activation); Chrome remote debugging for doctor |
+| webwright | skill symlink under `~/.agents/skills` (optional long-horizon web) |
 | pi | **bun** global (`bun install -g …`); wrappers in `~/.local/bin` — **no Node/npm** |
 | Ghostty / Zed / Signal / Slack / WhatsApp | Nix home packages |
 | zellij | Flake input [kaankoken/zellij](https://github.com/kaankoken/zellij) (`main`) via `overlays.default` |

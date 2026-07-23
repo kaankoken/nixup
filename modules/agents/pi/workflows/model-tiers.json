@@ -1,0 +1,14 @@
+{
+  "tiers": {
+    "small": "openai/gpt-5.6-sol:low",
+    "medium": "xai/grok-4.5:high",
+    "big": "openai/gpt-5.6-sol:ultra"
+  },
+  "notes": {
+    "big": "Review/spec/plan primary (sol ultra). Fallbacks in agentTypes: fable max, opus high.",
+    "medium": "Implement primary (xai/grok-4.5:high — always high effort). Fallbacks: sol high, opus high.",
+    "grok": "ALWAYS xai/grok-4.5:high — never lower effort for Grok",
+    "small": "Scouts / cheap recon (sol low).",
+    "auth": "anthropic via Claude Code; openai via GPT account; xai via Grok account"
+  }
+}

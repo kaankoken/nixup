@@ -1,0 +1,79 @@
+# {{DESCRIPTION}}
+
+Project-local agent instructions for the **shared agent stack** (Claude / Codex / Cursor / Grok / Pi). Do **not** invent a parallel workflow. **Never** wire or use codebase-memory.
+
+## CLI contract (prefer these)
+
+| Layer | Tool | How |
+|-------|------|-----|
+| Shell output | **RTK** (`rtk`) | Prefix shell with `rtk` (or RTK hooks). See `RTK.md` if present. |
+| Tasks / memory | **beads (`bd`)** | Source of truth: `bd ready`, `bd update --claim`, `bd close`. Not ad-hoc markdown TODOs when tracking matters. |
+| Traffic compress | **headroom** | Prefer `headroom wrap …` when available. MCP: compress / retrieve. |
+| Code structure | **tokensave only** | `tokensave_context`, search, callers, impact. **Never codebase-memory.** |
+| Tool/MCP flood | **context-mode** | Large reads, logs, web fetches → sandbox / `ctx_execute`. Prefer over dumping raw MCP output. |
+| Structural edits | **ast-grep** (`sg`) | AST search/rewrite over regex `sed`/`perl`. |
+| External docs | **context7** | Library/API docs (free tier; no API key). Do not invent APIs. |
+| Output brevity | **caveman** | Terse agent prose (`/caveman` or session default). |
+| Code minimalism | **ponytail** | YAGNI / reuse / stdlib-first (`/ponytail` or session default). |
+
+### Discovery order (code)
+
+1. **tokensave** (MCP or CLI) — symbols, callers, impact, context.
+2. **`sg` / `ast-grep`**, then `rg` / `fd` — AST patterns, literals, paths tokensave cannot answer.
+3. Targeted file reads — not whole-repo thrashing.
+4. **Never** codebase-memory-mcp.
+
+If MCP tools are missing in a child/subagent, fall back immediately to CLI:
+
+```bash
+rtk tokensave …   # or: tokensave <cmd>
+sg -p 'PATTERN' -l <lang>
+rtk rg …
+```
+
+## Stack tools
+
+{{STACK_TOOLS}}
+
+## Structure
+
+{{STRUCTURE}}
+
+## Nested AGENTS map
+
+| Path | Scope |
+|------|--------|
+| `/AGENTS.md` (this file) | Repo-wide CLI contract, quality bar, stack |
+| *(fill after scaffold)* | Per-subdir scope — see nested `AGENTS.md` files |
+
+`CLAUDE.md` at every level is a **symlink** to the sibling `AGENTS.md` (`ln -sfn AGENTS.md CLAUDE.md`). Nested files take precedence for files under their directory tree. Deeper wins on conflict. Direct user chat instructions always win.
+
+## Quality goals (default 1–7)
+
+Used when `/goal` or `/harness` runs without override text (Pi goal harness):
+
+1. No errors, no warnings, no test failures.
+2. No warning suppressions in production (test-only OK with reason).
+3. Everything wired — no stubs, TODO/TBD/FIXME, unfinished work.
+4. Mandated skills: superpowers + stack + caveman + ponytail.
+5. Latest dependencies — verify on the web (not training data alone).
+6. Complete all superpowers-derived spec/plan tasks.
+7. Specs, plans, goals, updates tracked in **bd** (SoT). Markdown export is optional.
+
+## Skills enabled for this project
+
+- **superpowers** (process engine: brainstorm → plan → implement → review → PR)
+- **caveman** (terse prose)
+- **ponytail** (lean code)
+- Stack skills as listed under Stack tools
+- Pi: **goal-harness** when running under Pi (`/goal`, `/harness`, `/init`)
+
+## Pi goal harness (when using Pi)
+
+| Command | Behavior |
+|---------|----------|
+| `/goal [text]` | Full harness; goal = text or default 7 quality rules |
+| `/harness [text]` | Alias of `/goal` |
+| `/init` | Project scaffold only (this template path) |
+
+Orchestration: **pi-dynamic-workflows**. Process: **superpowers**. Templates live under `~/.pi/agent/` when deployed from nix-setup `modules/agents/pi/`.

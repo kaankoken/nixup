@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "tokensave": {
+      "command": "tokensave",
+      "args": ["serve"]
+    },
+    "headroom": {
+      "command": "headroom",
+      "args": ["mcp", "serve"]
+    },
+    "context-mode": {
+      "command": "context-mode"
+    },
+    "context7": {
+      "url": "https://mcp.context7.com/mcp"
+    }
+  }
+}

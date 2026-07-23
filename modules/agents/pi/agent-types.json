@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "description": "Named agentType summary for pi-dynamic-workflows. Full system prompts live in agents/*.md. Model tiers map to ~/.pi/workflows/model-tiers.json.",
+  "agentTypes": {
+    "project-init": {
+      "name": "project-init",
+      "tier": "medium",
+      "skills": ["project-init scaffold", "bd"],
+      "promptFile": "agents/project-init.md",
+      "notes": "Stack-aware AGENTS/CLAUDE/bd scaffold only"
+    },
+    "spec-writer": {
+      "name": "spec-writer",
+      "tier": "big",
+      "skills": ["brainstorming", "caveman", "ponytail"],
+      "promptFile": "agents/spec-writer.md",
+      "notes": "Producer Spec gate; may request research-fanout"
+    },
+    "spec-reviewer": {
+      "name": "spec-reviewer",
+      "tier": "big",
+      "skills": ["requesting-code-review"],
+      "promptFile": "agents/spec-reviewer.md",
+      "reviewer": true,
+      "notes": "JSON {ok, feedback, blocking}"
+    },
+    "plan-writer": {
+      "name": "plan-writer",
+      "tier": "big",
+      "skills": ["writing-plans", "caveman", "ponytail"],
+      "promptFile": "agents/plan-writer.md"
+    },
+    "plan-reviewer": {
+      "name": "plan-reviewer",
+      "tier": "big",
+      "skills": [],
+      "promptFile": "agents/plan-reviewer.md",
+      "reviewer": true,
+      "notes": "JSON {ok, feedback, blocking}"
+    },
+    "bite-size-writer": {
+      "name": "bite-size-writer",
+      "tier": "big",
+      "skills": ["writing-plans"],
+      "promptFile": "agents/bite-size-writer.md"
+    },
+    "bite-size-reviewer": {
+      "name": "bite-size-reviewer",
+      "tier": "big",
+      "skills": [],
+      "promptFile": "agents/bite-size-reviewer.md",
+      "reviewer": true,
+      "notes": "JSON {ok, feedback, blocking}; N=2"
+    },
+    "implementer": {
+      "name": "implementer",
+      "tier": "medium",
+      "skills": [
+        "subagent-driven-development",
+        "using-git-worktrees",
+        "test-driven-development",
+        "ponytail",
+        "caveman",
+        "stack-auto"
+      ],
+      "promptFile": "agents/implementer.md",
+      "isolation": "worktree",
+      "notes": "Implement pool: xai/grok-4.5:high (ALWAYS high) → openai/gpt-5.6-sol:high → anthropic/claude-opus-4-8:high"
+    },
+    "milestone-organizer": {
+      "name": "milestone-organizer",
+      "tier": "big",
+      "skills": [
+        "requesting-code-review",
+        "verification-before-completion"
+      ],
+      "promptFile": "agents/milestone-organizer.md"
+    },
+    "code-reviewer": {
+      "name": "code-reviewer",
+      "tier": "big",
+      "skills": ["requesting-code-review", "ponytail", "stack-auto"],
+      "promptFile": "agents/code-reviewer.md",
+      "reviewer": true,
+      "notes": "JSON {ok, feedback, blocking}"
+    },
+    "code-graph-scout": {
+      "name": "code-graph-scout",
+      "tier": "medium",
+      "skills": ["tokensave"],
+      "promptFile": "agents/code-graph-scout.md",
+      "notes": "CLI fallback if MCP missing"
+    },
+    "code-search-scout": {
+      "name": "code-search-scout",
+      "tier": "medium",
+      "skills": ["ast-grep"],
+      "promptFile": "agents/code-search-scout.md"
+    },
+    "docs-scout": {
+      "name": "docs-scout",
+      "tier": "small",
+      "skills": ["context7"],
+      "promptFile": "agents/docs-scout.md"
+    },
+    "web-scout": {
+      "name": "web-scout",
+      "tier": "small",
+      "skills": ["web-search", "fetch"],
+      "promptFile": "agents/web-scout.md",
+      "notes": "DEFAULT: search+fetch; goal #5 latest deps"
+    },
+    "web-browse-scout": {
+      "name": "web-browse-scout",
+      "tier": "medium",
+      "skills": ["chrome-cdp"],
+      "promptFile": "agents/web-browse-scout.md",
+      "notes": "OPTIONAL CDP/headless; research-fanout includeBrowse"
+    },
+    "browser-use-scout": {
+      "name": "browser-use-scout",
+      "tier": "medium",
+      "skills": ["browser-use", "playwright"],
+      "promptFile": "agents/browser-use-scout.md",
+      "notes": "HEAVY multi-step browser-use; research-fanout includeBrowserUse; nix installs CLI"
+    },
+    "webwright-scout": {
+      "name": "webwright-scout",
+      "tier": "medium",
+      "skills": ["webwright"],
+      "promptFile": "agents/webwright-scout.md",
+      "notes": "TIER-4 Microsoft Webwright; research-fanout includeWebwright; skill under ~/.agents/skills"
+    },
+    "stack-scout": {
+      "name": "stack-scout",
+      "tier": "small",
+      "skills": ["stack-auto"],
+      "promptFile": "agents/stack-scout.md"
+    },
+    "pr-opener": {
+      "name": "pr-opener",
+      "tier": "small",
+      "skills": ["finishing-a-development-branch"],
+      "promptFile": "agents/pr-opener.md"
+    }
+  },
+  "gates": {
+    "spec": { "attempts": 3, "producer": "spec-writer", "reviewer": "spec-reviewer" },
+    "plan": { "attempts": 3, "producer": "plan-writer", "reviewer": "plan-reviewer" },
+    "biteSize": { "attempts": 2, "producer": "bite-size-writer", "reviewer": "bite-size-reviewer" },
+    "milestone": { "attempts": 3, "producer": "milestone-organizer", "reviewer": "code-reviewer" }
+  }
+}
