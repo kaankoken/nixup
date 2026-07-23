@@ -87,15 +87,15 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 | **Zerobrew → Homebrew fallback** (Mac) | **`mole`**: `zb install` then `brew install`. **`aerospace`**: `zb` then `brew install --cask nikitabobko/tap/aerospace`. Soft-fail if both fail |
 | **uv** | **headroom** — `uv tool install "headroom-ai[proxy,ml,code,mcp,evals]"` (modules/agents) |
 | **Manual** | Microsoft Outlook, Codex desktop |
-| **Activation (curl)** | rustup, claude-code, **codex** (`chatgpt.com/codex/install.sh`), **rtk** (rtk-ai install.sh), **beads**, **grok**, **caveman** (skill installer; needs Node ≥18) |
-| **Activation (bun)** | **pi** only (`bun install -g`; wrappers in `~/.local/bin`) — **no Node/npm for pi** |
+| **Activation (curl)** | rustup, claude-code, **codex** (standalone via `chatgpt.com/codex/install.sh`; purges legacy bun/npm wrappers), **rtk** (→ `~/.local/bin`), **beads**, **grok**, **caveman** (skill installer; needs Node ≥18) |
+| **Activation (bun)** | **pi** only (`bun install -g`; wrappers in `~/.local/bin`) — **never codex** |
 
 ### Sources of truth
 
 | Tool | Install path |
 |------|----------------|
-| rtk | **curl** official install.sh (modules/agents) — not Nix / not zerobrew |
-| codex | **curl** `https://chatgpt.com/codex/install.sh \| sh` (modules/agents) |
+| rtk | **curl** official install.sh → `~/.local/bin/rtk` (modules/agents); may symlink from brew/zerobrew if already native |
+| codex | **curl** standalone `https://chatgpt.com/codex/install.sh \| sh` → `~/.codex/packages/standalone` + `~/.local/bin/codex` (modules/agents); **not** bun/npm |
 | caveman | **curl** JuliusBrussee/caveman `install.sh` (multi-agent skill; Node ≥18) |
 | mole | zerobrew (`zb install mole`) — not Nix |
 | aerospace | zb if indexed; else **`brew install --cask nikitabobko/tap/aerospace`** |
