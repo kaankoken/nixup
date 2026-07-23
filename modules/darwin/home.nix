@@ -8,7 +8,7 @@
 #
 # Not here (zerobrew / agents instead):
 # - aerospace, mole → modules/darwin/zerobrew.nix
-# - rtk, codex, caveman, headroom → modules/agents
+# - rtk, codex, caveman, ponytail, headroom → modules/agents
 { lib, pkgs, ... }:
 let
   optionalPkg = name: lib.optional (pkgs ? ${name}) pkgs.${name};

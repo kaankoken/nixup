@@ -87,7 +87,7 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 | **Zerobrew → Homebrew fallback** (Mac) | **`mole`**: `zb install` then `brew install`. **`aerospace`**: `zb` then `brew install --cask nikitabobko/tap/aerospace`. Soft-fail if both fail |
 | **uv** | **headroom** — `uv tool install "headroom-ai[proxy,ml,code,mcp,evals]"` (modules/agents) |
 | **Manual** | Microsoft Outlook, Codex desktop |
-| **Activation (curl)** | rustup, claude-code, **codex** (standalone via `chatgpt.com/codex/install.sh`; purges legacy bun/npm wrappers), **rtk** (→ `~/.local/bin`), **beads**, **grok**, **caveman** (skill installer; needs Node ≥18) |
+| **Activation (curl)** | rustup, claude-code, **codex** (standalone via `chatgpt.com/codex/install.sh`; purges legacy bun/npm wrappers), **rtk** (→ `~/.local/bin`), **beads**, **grok**, **caveman** (skill installer; needs Node ≥18), **ponytail** (skill/plugin multi-path: Claude/Codex/pi + portable `~/.agents/skills`) |
 | **Activation (bun)** | **pi** only (`bun install -g`; wrappers in `~/.local/bin`) — **never codex** |
 
 ### Sources of truth
@@ -97,6 +97,7 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 | rtk | **curl** official install.sh → `~/.local/bin/rtk` (modules/agents); may symlink from brew/zerobrew if already native |
 | codex | **curl** standalone `https://chatgpt.com/codex/install.sh \| sh` → `~/.codex/packages/standalone` + `~/.local/bin/codex` (modules/agents); **not** bun/npm |
 | caveman | **curl** JuliusBrussee/caveman `install.sh` (multi-agent skill; Node ≥18) |
+| ponytail | **Claude/Codex plugins + pi package + portable skill files** DietrichGebert/ponytail (modules/agents) |
 | mole | zerobrew (`zb install mole`) — not Nix |
 | aerospace | zb if indexed; else **`brew install --cask nikitabobko/tap/aerospace`** |
 | headroom | **uv** only |
@@ -149,8 +150,9 @@ scripts/archived/              # former Nu bootstrap/smoke
 - **Codex desktop** is out of scope; install manually. CLI `codex` is agents activation via official **curl** installer.
 - **grok** binary name is `grok` (from x.ai install script), not `grok-build`.
 - **zerobrew (`zb`)** first for **mole / aerospace**; if zb cannot resolve a package, fall back to **Homebrew**. AeroSpace: `brew install --cask nikitabobko/tap/aerospace`.
-- **rtk / codex / caveman:** official curl installers in `modules/agents` (not zerobrew).
+- **rtk / codex / caveman / ponytail:** agent installers in `modules/agents` (not zerobrew).
 - **caveman:** multi-agent skill (not a PATH binary); installer wants Node ≥18 — soft-fail if missing.
+- **ponytail:** lean-code skill (not a PATH binary); Claude/Codex plugins + `pi install` + portable skills under `~/.agents/skills` — soft-fail if all paths fail. Complements caveman (prose vs code).
 - **headroom:** uv only (`modules/agents`); smoke lists it as optional.
 - **rtk / mole / aerospace:** optional in smoke; rtk via agents, mole/aerospace via zerobrew.
 - **Secrets** stay outside this flake (keychain / existing logins).
