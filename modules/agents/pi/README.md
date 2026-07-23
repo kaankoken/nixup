@@ -38,11 +38,32 @@ Live Pi home layout:
 
 | Package | Role |
 |---------|------|
-| **`@quintinshaw/pi-dynamic-workflows`** | Spawn/orchestration runtime (primary harness engine) |
-| **`pi-mcp-adapter`** | Wire tokensave, headroom, context-mode, context7 into Pi (version unpinned until live install succeeds) |
+| **`@quintinshaw/pi-dynamic-workflows`** | Spawn/orchestration runtime |
+| **`pi-mcp-adapter`** | MCP client for tokensave/headroom/context-mode/context7 |
+| **`git:…/chrome-cdp-skill`** | Optional CDP for `web-browse-scout` |
 
-Also required on PATH (shared stack, not Pi packages): `rtk`, `bd`, `tokensave`,
-`sg`/`ast-grep`, `headroom`, `context-mode`, skills caveman + ponytail.
+**Ponytail** is *not* a pi package — portable skills live under `~/.agents/skills` (avoids name collisions with package + project copies).
+
+## Skills paths (deduped)
+
+Pi should load **only**:
+
+1. `~/.agents/skills` — shared portable skills (superpowers, ponytail, android, …)
+2. `~/.pi/agent/skills` — harness-only (`goal-harness`)
+
+Do **not** also list `~/.claude/skills` or Claude plugin caches — that multiplies every skill and floods startup with collision warnings. Project `.agents/skills` still wins over user when present (normal Pi precedence).
+
+Also required on PATH: `rtk`, `bd`, `tokensave`, `sg`/`ast-grep`, `headroom`, `context-mode`, `browser-use`.
+
+## Models
+
+`auth.json` is empty until you log in. In pi:
+
+```text
+/login
+```
+
+Authenticate Anthropic (Claude Code / fable / opus), OpenAI (gpt-5.6-sol), and xAI (grok-4.5) as needed. Then models from `enabledModels` become available.
 
 ## MCP (no codebase-memory)
 

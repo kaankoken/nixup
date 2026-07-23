@@ -615,7 +615,7 @@ if harness_path.is_file():
         harness = json.loads(harness_path.read_text())
     except Exception:
         harness = {}
-# packages: ensure required sources present
+# packages: ensure required sources present; drop ponytail git pkg if portable skills exist
 packages = data.get("packages")
 if not isinstance(packages, list):
     packages = []
@@ -624,6 +624,16 @@ wanted = [
     "npm:pi-mcp-adapter",
     "git:github.com/pasky/chrome-cdp-skill",
 ]
+# Portable ponytail under ~/.agents/skills — do not also load pi package copy (skill collisions)
+ponytail_portable = (home / ".agents" / "skills" / "ponytail" / "SKILL.md").is_file()
+filtered = []
+for p in packages:
+    s = str(p.get("source", p) if isinstance(p, dict) else p)
+    if ponytail_portable and "ponytail" in s.lower():
+        print("drop package (portable ponytail skills present):", s)
+        continue
+    filtered.append(p)
+packages = filtered
 for src in wanted:
     if not any(
         (isinstance(p, str) and src in p)
@@ -632,22 +642,29 @@ for src in wanted:
     ):
         packages.append(src)
 data["packages"] = packages
-# skills globs
-skills = data.get("skills")
-if not isinstance(skills, list):
-    skills = []
-for s in harness.get("skills") or [
-    "~/.agents/skills",
-    "~/.claude/skills",
-    "~/.claude/plugins/cache/claude-plugins-official/superpowers",
-]:
-    if s not in skills:
-        skills.append(s)
-# ensure goal-harness skill path
-gh = str(agent / "skills")
-if gh not in skills and "~/.pi/agent/skills" not in skills:
-    skills.append(str(agent / "skills"))
+# Skills: single canonical tree + pi harness skills only.
+# Do NOT also load ~/.claude/skills or plugin caches — duplicates cause startup collisions.
+skills = ["~/.agents/skills", "~/.pi/agent/skills"]
+# Prefer harness file list if it is already the deduped set
+if isinstance(harness.get("skills"), list) and harness["skills"]:
+    # Only allow known-safe roots (no ~/.claude/*)
+    safe = []
+    for s in harness["skills"]:
+        ss = str(s)
+        if ".claude" in ss and "plugins/cache" in ss:
+            continue
+        if ss.endswith("/.claude/skills") or "/.claude/skills" in ss:
+            continue
+        if ss not in safe:
+            safe.append(ss)
+    if safe:
+        skills = safe
+    if "~/.agents/skills" not in skills:
+        skills.insert(0, "~/.agents/skills")
+    if "~/.pi/agent/skills" not in skills and str(agent / "skills") not in skills:
+        skills.append("~/.pi/agent/skills")
 data["skills"] = skills
+print("pi skills paths:", skills)
 # prompts + agents dirs (if settings supports)
 for key in ("enableSkillCommands", "defaultThinkingLevel", "quietStartup"):
     if key in harness and key not in data:

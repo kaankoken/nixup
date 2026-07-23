@@ -9,8 +9,7 @@
   ],
   "skills": [
     "~/.agents/skills",
-    "~/.claude/skills",
-    "~/.claude/plugins/cache/claude-plugins-official/superpowers"
+    "~/.pi/agent/skills"
   ],
   "extensions": [
     "extensions/rtk.ts"
