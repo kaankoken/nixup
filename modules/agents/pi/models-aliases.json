@@ -1,19 +1,53 @@
 {
   "auth_notes": {
-    "anthropic": "Claude Code subscription (claude-fable-5, claude-opus-4-8)",
-    "openai": "GPT / OpenAI account (gpt-5.6-sol)",
-    "xai": "Grok account (grok-4.5)"
+    "anthropic": "Claude Code OAuth (claude-fable-5, claude-opus-4-8). Third-party apps need extra usage at claude.ai/settings/usage.",
+    "openai-codex": "ChatGPT / Codex OAuth — provider id is openai-codex (not openai). Models: gpt-5.6-sol | terra | luna.",
+    "xai": "Grok OAuth (grok-4.5). Run: pi /login → xai"
   },
+  "effort_ladder": {
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "extra_high": "xhigh",
+    "max": "max",
+    "ultra": "ultra",
+    "notes": "Pi suffixes: :low :medium :high :xhigh :max :ultra. :ultra only on gpt-5.6-sol and gpt-5.6-terra (not luna). Provider openai-codex only — never openai/."
+  },
+  "openai_codex_models": [
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna"
+  ],
   "review_pool": [
     {
-      "alias": "gpt-sol-5.6",
-      "provider": "openai",
-      "id": "gpt-5.6-sol",
-      "pi": "openai/gpt-5.6-sol",
-      "effort": "ultra",
-      "piWithEffort": "openai/gpt-5.6-sol:ultra",
+      "alias": "gpt-luna-5.6",
+      "provider": "openai-codex",
+      "id": "gpt-5.6-luna",
+      "pi": "openai-codex/gpt-5.6-luna",
+      "effort": "high",
+      "piWithEffort": "openai-codex/gpt-5.6-luna:high",
       "priority": 1,
-      "notes": "Primary review / spec / plan / milestone; sol ultra via GPT account"
+      "notes": "Default review; luna high (Ctrl+P cycles sol/terra/luna × effort ladder)"
+    },
+    {
+      "alias": "gpt-sol-5.6",
+      "provider": "openai-codex",
+      "id": "gpt-5.6-sol",
+      "pi": "openai-codex/gpt-5.6-sol",
+      "effort": "ultra",
+      "piWithEffort": "openai-codex/gpt-5.6-sol:ultra",
+      "priority": 2,
+      "notes": "Heavy review / milestone; sol ultra (terra also supports :ultra)"
+    },
+    {
+      "alias": "gpt-terra-5.6",
+      "provider": "openai-codex",
+      "id": "gpt-5.6-terra",
+      "pi": "openai-codex/gpt-5.6-terra",
+      "effort": "high",
+      "piWithEffort": "openai-codex/gpt-5.6-terra:high",
+      "priority": 3,
+      "notes": "Terra high"
     },
     {
       "alias": "fable-5",
@@ -22,18 +56,18 @@
       "pi": "anthropic/claude-fable-5",
       "effort": "max",
       "piWithEffort": "anthropic/claude-fable-5:max",
-      "priority": 2,
-      "notes": "Anthropic Fable via Claude Code account; max effort"
+      "priority": 4,
+      "notes": "Anthropic Fable max"
     },
     {
       "alias": "opus",
       "provider": "anthropic",
       "id": "claude-opus-4-8",
       "pi": "anthropic/claude-opus-4-8",
-      "effort": "high",
-      "piWithEffort": "anthropic/claude-opus-4-8:high",
-      "priority": 3,
-      "notes": "Opus fallback via Claude Code account"
+      "effort": "xhigh",
+      "piWithEffort": "anthropic/claude-opus-4-8:xhigh",
+      "priority": 5,
+      "notes": "Opus xhigh"
     }
   ],
   "implement_pool": [
@@ -46,62 +80,80 @@
       "effort_locked": true,
       "piWithEffort": "xai/grok-4.5:high",
       "priority": 1,
-      "notes": "Primary implement via Grok account. ALWAYS high effort — never call without :high."
+      "notes": "Primary implement. ALWAYS high."
+    },
+    {
+      "alias": "gpt-luna-5.6",
+      "provider": "openai-codex",
+      "id": "gpt-5.6-luna",
+      "pi": "openai-codex/gpt-5.6-luna",
+      "effort": "high",
+      "piWithEffort": "openai-codex/gpt-5.6-luna:high",
+      "priority": 2,
+      "notes": "Implement fallback; luna high"
     },
     {
       "alias": "gpt-sol-5.6",
-      "provider": "openai",
+      "provider": "openai-codex",
       "id": "gpt-5.6-sol",
-      "pi": "openai/gpt-5.6-sol",
+      "pi": "openai-codex/gpt-5.6-sol",
       "effort": "high",
-      "piWithEffort": "openai/gpt-5.6-sol:high",
-      "priority": 2,
-      "notes": "Implement fallback; sol high (not ultra)"
+      "piWithEffort": "openai-codex/gpt-5.6-sol:high",
+      "priority": 3,
+      "notes": "sol high"
+    },
+    {
+      "alias": "gpt-terra-5.6",
+      "provider": "openai-codex",
+      "id": "gpt-5.6-terra",
+      "pi": "openai-codex/gpt-5.6-terra",
+      "effort": "high",
+      "piWithEffort": "openai-codex/gpt-5.6-terra:high",
+      "priority": 4,
+      "notes": "terra high"
     },
     {
       "alias": "opus",
       "provider": "anthropic",
       "id": "claude-opus-4-8",
       "pi": "anthropic/claude-opus-4-8",
-      "effort": "high",
-      "piWithEffort": "anthropic/claude-opus-4-8:high",
-      "priority": 3,
-      "notes": "Implement pool third; Claude Code account"
+      "effort": "xhigh",
+      "piWithEffort": "anthropic/claude-opus-4-8:xhigh",
+      "priority": 5,
+      "notes": "Opus xhigh"
     }
   ],
   "scout_pool": [
     {
       "alias": "scout-small",
-      "provider": "openai",
-      "id": "gpt-5.6-sol",
-      "pi": "openai/gpt-5.6-sol",
+      "provider": "openai-codex",
+      "id": "gpt-5.6-luna",
+      "pi": "openai-codex/gpt-5.6-luna",
       "effort": "low",
-      "piWithEffort": "openai/gpt-5.6-sol:low",
+      "piWithEffort": "openai-codex/gpt-5.6-luna:low",
       "tier": "small",
-      "priority": 1,
-      "notes": "Cheap research scouts — sol low"
+      "priority": 1
     },
     {
       "alias": "scout-medium",
-      "provider": "openai",
-      "id": "gpt-5.6-sol",
-      "pi": "openai/gpt-5.6-sol",
+      "provider": "openai-codex",
+      "id": "gpt-5.6-luna",
+      "pi": "openai-codex/gpt-5.6-luna",
       "effort": "medium",
-      "piWithEffort": "openai/gpt-5.6-sol:medium",
+      "piWithEffort": "openai-codex/gpt-5.6-luna:medium",
       "tier": "medium",
-      "priority": 2,
-      "notes": "code-graph / multi-file recon"
+      "priority": 2
     }
   ],
   "resolved": {
-    "review_primary": "openai/gpt-5.6-sol:ultra",
-    "review_secondary": "anthropic/claude-fable-5:max",
-    "review_tertiary": "anthropic/claude-opus-4-8:high",
+    "review_primary": "openai-codex/gpt-5.6-luna:high",
+    "review_secondary": "openai-codex/gpt-5.6-sol:ultra",
+    "review_tertiary": "anthropic/claude-fable-5:max",
     "implement_primary": "xai/grok-4.5:high",
-    "implement_secondary": "openai/gpt-5.6-sol:high",
-    "implement_tertiary": "anthropic/claude-opus-4-8:high",
-    "big": "openai/gpt-5.6-sol:ultra",
+    "implement_secondary": "openai-codex/gpt-5.6-luna:high",
+    "implement_tertiary": "openai-codex/gpt-5.6-sol:high",
+    "big": "openai-codex/gpt-5.6-sol:ultra",
     "medium": "xai/grok-4.5:high",
-    "small": "openai/gpt-5.6-sol:low"
+    "small": "openai-codex/gpt-5.6-luna:low"
   }
 }

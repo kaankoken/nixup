@@ -65,7 +65,7 @@
       ],
       "promptFile": "agents/implementer.md",
       "isolation": "worktree",
-      "notes": "Implement pool: xai/grok-4.5:high (ALWAYS high) → openai/gpt-5.6-sol:high → anthropic/claude-opus-4-8:high"
+      "notes": "Implement pool: xai/grok-4.5:high (ALWAYS high) → openai-codex/gpt-5.6-luna|sol|terra:high → anthropic/claude-opus-4-8:xhigh"
     },
     "milestone-organizer": {
       "name": "milestone-organizer",

@@ -91,9 +91,12 @@ FAIL with attempts remaining → producer revises with feedback. Attempts exhaus
 
 | Role | Chain (Pi id) | Effort |
 |------|----------------|--------|
-| Spec / plan / bite-size / milestone review | `openai/gpt-5.6-sol` → `anthropic/claude-fable-5` → `anthropic/claude-opus-4-8` | sol **ultra**; fable **max**; opus **high** |
-| Implement | `xai/grok-4.5:high` → `openai/gpt-5.6-sol:high` → `anthropic/claude-opus-4-8:high` | **high** |
-| Research scouts | tier `small` = sol:low; `medium` = **grok:high** | scouts may use sol:low; if Grok is used, always **:high** |
+| Spec / plan / bite-size / milestone review | `openai-codex/gpt-5.6-luna` → `openai-codex/gpt-5.6-sol` → `anthropic/claude-fable-5` | luna **high**; sol **ultra**; fable **max** (also terra; effort ladder low→ultra) |
+| Implement | `xai/grok-4.5:high` → `openai-codex/gpt-5.6-luna:high` → `openai-codex/gpt-5.6-sol:high` | grok **high**; luna/sol/terra **high**+ |
+
+**OpenAI Codex models (provider `openai-codex` only — never `openai/`):** `gpt-5.6-sol` · `gpt-5.6-terra` · `gpt-5.6-luna`  
+**Effort ladder:** `:low` · `:medium` · `:high` · `:xhigh` · `:max` · `:ultra` (**ultra only on sol & terra**, not luna)
+| Research scouts | tier `small` = luna:low; `medium` = **grok:high** | scouts may use luna:low; if Grok is used, always **:high** |
 
 **Grok rule:** any use of Grok **must** be `xai/grok-4.5:high` (or equivalent high effort). Never spawn Grok on low/medium/off.
 

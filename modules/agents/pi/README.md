@@ -61,7 +61,7 @@ Also required on PATH: `rtk`, `bd`, `tokensave`, `sg`/`ast-grep`, `headroom`, `c
 /login
 ```
 
-Authenticate Anthropic (Claude Code / fable / opus), OpenAI (gpt-5.6-sol), and xAI (grok-4.5) as needed. Then models from `enabledModels` become available.
+Authenticate Anthropic (Claude Code / fable / opus), OpenAI Codex (`openai-codex` / gpt-5.6-luna|terra|sol), and xAI (grok-4.5) as needed. Then models from `enabledModels` become available. Primary OpenAI id is `openai-codex/gpt-5.6-luna:high` — never `openai/gpt-5.6-*`. Effort: `:low` `:medium` `:high` `:xhigh` `:max` `:ultra` (ultra only on sol & terra).
 
 ## MCP (no codebase-memory)
 

@@ -149,14 +149,16 @@ let
 
     # Global bun package + ~/.local/bin wrapper that runs the entry under bun
     # (packages ship #!/usr/bin/env node; we never put Node on PATH).
-    # ONLY for pi (and similar pure-JS CLIs) — never codex/rtk/bd.
+    # ONLY for pure-JS CLIs that are NOT pi — never codex/rtk/bd/pi.
+    # pi uses install_pi_via_bun (isolated prefix; home package.json breaks bun -g).
     install_bun_cli() {
       local package="$1"
       local bin_name="$2"
       require_bun || return 1
       mkdir -p "$HOME/.local/bin" "$HOME/.bun/bin"
       log "bun install -g $package"
-      if ! bun install -g "$package"; then
+      # Isolate from ~/package.json which makes bun -g land in ~/node_modules
+      if ! ( cd /tmp && bun install -g "$package" ); then
         fail "bun install -g $package failed"
         return 1
       fi
@@ -187,6 +189,157 @@ let
       chmod +x "$dest"
       export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
       log "wrapper $dest -> bun $bun_bin"
+      return 0
+    }
+
+    # Pi: never use bare `bun install -g` from $HOME — package.json there hijacks
+    # global installs into ~/node_modules and breaks `pi update` self-detect.
+    # Isolated prefix: ~/.local/share/nix-setup/pi + dedicated wrapper with update.
+    PI_BUN_PREFIX="$HOME/.local/share/nix-setup/pi"
+    pi_cli_js() {
+      printf '%s\n' "$PI_BUN_PREFIX/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
+    }
+
+    install_pi_via_bun() {
+      local cli
+      require_bun || return 1
+      mkdir -p "$PI_BUN_PREFIX" "$HOME/.local/bin" "$HOME/.bun/bin"
+      if [ ! -f "$PI_BUN_PREFIX/package.json" ]; then
+        printf '%s\n' \
+          '{' \
+          '  "name": "nix-setup-pi",' \
+          '  "private": true' \
+          '}' >"$PI_BUN_PREFIX/package.json"
+      fi
+      log "bun add @earendil-works/pi-coding-agent in $PI_BUN_PREFIX"
+      if ! (
+        cd "$PI_BUN_PREFIX" || exit 1
+        bun add "@earendil-works/pi-coding-agent@latest" 2>/dev/null \
+          || bun add "@earendil-works/pi-coding-agent"
+      ); then
+        fail "bun add pi-coding-agent failed in $PI_BUN_PREFIX"
+        return 1
+      fi
+      cli=$(pi_cli_js)
+      if [ ! -f "$cli" ]; then
+        fail "pi cli.js missing at $cli"
+        return 1
+      fi
+      # Keep ~/.bun/bin/pi pointing at isolated install (not ~/node_modules)
+      ln -sfn "$cli" "$HOME/.bun/bin/pi"
+      wrap_pi_cli
+      return 0
+    }
+
+    wrap_pi_cli() {
+      local dest="$HOME/.local/bin/pi"
+      local cli
+      cli=$(pi_cli_js)
+      mkdir -p "$HOME/.local/bin"
+      # Write wrapper; Nix-safe (no unescaped ''${...} in shell body).
+      cat >"$dest" <<'PIWRAP'
+#!/bin/sh
+# Managed by nix-setup modules/agents — Pi via isolated bun prefix (no system Node).
+# `pi update` is handled here because stock self-update expects npm/bun global layouts.
+export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
+PI_PREFIX="$HOME/.local/share/nix-setup/pi"
+PI_CLI="$PI_PREFIX/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
+
+if [ ! -f "$PI_CLI" ]; then
+  echo "pi: missing $PI_CLI — run nixup apply / agents activation" >&2
+  exit 127
+fi
+
+pi_self_update() {
+  echo "Updating pi (@earendil-works/pi-coding-agent) via bun (nix-setup)…"
+  mkdir -p "$PI_PREFIX"
+  if [ ! -f "$PI_PREFIX/package.json" ]; then
+    printf '%s\n' '{' '  "name": "nix-setup-pi",' '  "private": true' '}' >"$PI_PREFIX/package.json"
+  fi
+  (
+    cd "$PI_PREFIX" || exit 1
+    bun add "@earendil-works/pi-coding-agent@latest" 2>/dev/null \
+      || bun add "@earendil-works/pi-coding-agent"
+  ) || return 1
+  if [ -f "$PI_CLI" ]; then
+    ln -sfn "$PI_CLI" "$HOME/.bun/bin/pi" 2>/dev/null || true
+  fi
+  echo "pi now: $(bun "$PI_CLI" --version 2>/dev/null || echo unknown)"
+  return 0
+}
+
+pi_update_extensions() {
+  echo "Updating pi packages (dynamic-workflows, mcp-adapter, ponytail, chrome-cdp)…"
+  (
+    cd /tmp || exit 1
+    bun "$PI_CLI" install "npm:@quintinshaw/pi-dynamic-workflows" || true
+    bun "$PI_CLI" install "npm:pi-mcp-adapter" || true
+    bun "$PI_CLI" install "git:github.com/DietrichGebert/ponytail" || true
+    bun "$PI_CLI" install "git:github.com/pasky/chrome-cdp-skill" || true
+  )
+  echo "Package update finished (per-package soft-fail)."
+  return 0
+}
+
+if [ "''${1:-}" = "update" ]; then
+  shift
+  do_self=0
+  do_ext=0
+  do_models=0
+  if [ "$#" -eq 0 ]; then
+    do_self=1
+  fi
+  for a in "$@"; do
+    case "$a" in
+      --all|all) do_self=1; do_ext=1 ;;
+      --self|self|pi) do_self=1 ;;
+      --extensions|--packages|extensions|packages)
+        do_ext=1
+        if [ "$#" -eq 1 ]; then do_self=0; fi
+        ;;
+      --models|models)
+        do_models=1
+        if [ "$#" -eq 1 ]; then do_self=0; fi
+        ;;
+      -*)
+        ;;
+      *)
+        exec bun "$PI_CLI" update "$@"
+        ;;
+    esac
+  done
+  rc=0
+  if [ "$do_self" -eq 1 ]; then
+    pi_self_update || rc=1
+  fi
+  if [ "$do_ext" -eq 1 ]; then
+    pi_update_extensions || rc=1
+  fi
+  if [ "$do_models" -eq 1 ]; then
+    ( cd /tmp && bun "$PI_CLI" update --models ) || rc=1
+  fi
+  if [ "$do_self" -eq 1 ] && [ "$do_ext" -eq 0 ] && [ "$do_models" -eq 0 ]; then
+    echo "Extensions are skipped. Run: pi update --extensions"
+  fi
+  exit "$rc"
+fi
+
+exec bun "$PI_CLI" "$@"
+PIWRAP
+      chmod +x "$dest"
+      export PATH="$HOME/.local/bin:$PATH"
+      log "pi wrapper $dest -> $cli"
+      return 0
+    }
+
+    pi_install_healthy() {
+      local cli
+      cli=$(pi_cli_js)
+      [ -f "$cli" ] || return 1
+      [ -x "$HOME/.local/bin/pi" ] || return 1
+      # Reject legacy wrap_bun_cli / home node_modules layout
+      grep -qE 'local/share/nix-setup/pi|nix-setup-pi' "$HOME/.local/bin/pi" 2>/dev/null || return 1
+      "$HOME/.local/bin/pi" --version >/dev/null 2>&1 || return 1
       return 0
     }
 
@@ -386,11 +539,16 @@ NPMSHIM
       skip "npm shim skipped — need bun + python3"
     fi
 
-    # Repair pollution from older pi/bun runs (duplicate pi-extensions in home package.json).
+    # Repair pollution from older pi/bun runs (pi-coding-agent + extensions in home package.json).
     python3 - <<'PY' || true
 import json
 from pathlib import Path
 
+STRIP_DEPS = (
+    "pi-extensions",
+    "@earendil-works/pi-coding-agent",
+    "pi-coding-agent",
+)
 home = Path.home()
 for path in (home / "package.json", home / ".dotfiles" / "package.json"):
     if not path.exists():
@@ -401,12 +559,16 @@ for path in (home / "package.json", home / ".dotfiles" / "package.json"):
     except Exception:
         continue
     deps = data.get("dependencies")
-    if not isinstance(deps, dict) or "pi-extensions" not in deps:
+    if not isinstance(deps, dict):
         continue
-    del deps["pi-extensions"]
+    stripped = [k for k in STRIP_DEPS if k in deps]
+    if not stripped:
+        continue
+    for key in stripped:
+        del deps[key]
     data["dependencies"] = deps
     real.write_text(json.dumps(data, indent=2) + "\n")
-    print("stripped pi-extensions from", real)
+    print("stripped", ", ".join(stripped), "from", real)
 for lock in (home / "bun.lock", home / ".dotfiles" / "bun.lock"):
     if lock.is_file():
         try:
@@ -533,16 +695,17 @@ PY
     fi
 
     # --- pi coding agent (https://pi.dev) via bun only ---
-    # Official install.sh requires Node/npm and may install Node — we do not use it.
-    if command -v pi >/dev/null 2>&1 || [ -e "$HOME/.bun/bin/pi" ]; then
-      [ -e "$HOME/.bun/bin/pi" ] && wrap_bun_cli pi || true
-      ok "pi present ($(pi --version 2>/dev/null | head -1 || echo ok))"
+    # Isolated prefix ~/.local/share/nix-setup/pi — bare bun -g hijacks via ~/package.json.
+    # Official install.sh wants Node; we never use it.
+    if pi_install_healthy; then
+      wrap_pi_cli || true
+      ok "pi healthy ($(pi --version 2>/dev/null | head -1 || echo ok))"
     else
-      log "installing pi via bun (@earendil-works/pi-coding-agent)..."
-      if install_bun_cli "@earendil-works/pi-coding-agent" pi; then
+      log "installing/repairing pi via bun (isolated prefix)..."
+      if install_pi_via_bun; then
         ok "pi via bun ($(pi --version 2>/dev/null | head -1 || echo ok))"
       else
-        fail "pi install failed — bun install -g @earendil-works/pi-coding-agent"
+        fail "pi install failed — install_pi_via_bun @earendil-works/pi-coding-agent"
       fi
     fi
 
@@ -553,7 +716,7 @@ PY
       log "pi harness: installing dynamic-workflows + MCP adapter (fail-soft)..."
       _pi_harness_shim=""
       if ! command -v npm >/dev/null 2>&1 && command -v bun >/dev/null 2>&1; then
-        _pi_harness_shim=$(mktemp -d "${TMPDIR:-/tmp}/pi-harness-npm.XXXXXX")
+        _pi_harness_shim=$(mktemp -d "''${TMPDIR:-/tmp}/pi-harness-npm.XXXXXX")
         printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_pi_harness_shim/npm"
         chmod +x "$_pi_harness_shim/npm"
         export PATH="$_pi_harness_shim:$PATH"
@@ -673,11 +836,19 @@ if isinstance(harness.get("skills"), list) and harness["skills"]:
         skills.append("~/.pi/agent/skills")
 data["skills"] = skills
 print("pi skills paths:", skills)
-# prompts + agents dirs (if settings supports)
-for key in ("enableSkillCommands", "defaultThinkingLevel", "quietStartup"):
-    if key in harness and key not in data:
+# Always prefer harness model selection (catalog uses openai-codex, not openai).
+for key in (
+    "enableSkillCommands",
+    "defaultThinkingLevel",
+    "quietStartup",
+    "defaultProvider",
+    "defaultModel",
+    "enabledModels",
+    "grokEffort",
+):
+    if key in harness:
         data[key] = harness[key]
-if "compaction" in harness and "compaction" not in data:
+if "compaction" in harness:
     data["compaction"] = harness["compaction"]
 # extensions: keep rtk; merge harness extensions
 ext = data.get("extensions")
@@ -690,6 +861,21 @@ data["extensions"] = ext
 agent.mkdir(parents=True, exist_ok=True)
 settings_path.write_text(json.dumps(data, indent=2) + "\n")
 print("merged", settings_path)
+# Drop HM backup skill dirs (*.pre-hm) — Pi treats them as skills and collides.
+skills_root = agent / "skills"
+if skills_root.is_dir():
+    import shutil
+    for child in skills_root.iterdir():
+        name = child.name
+        if name.endswith(".pre-hm") or name.endswith(".hm-bak") or ".pre-hm" in name:
+            try:
+                if child.is_dir():
+                    shutil.rmtree(child)
+                else:
+                    child.unlink()
+                print("removed skill backup", child)
+            except Exception as exc:
+                print("skill backup remove failed", child, exc)
 PY
       ok "pi settings.harness merged into settings.json"
 
@@ -752,9 +938,9 @@ def pick_model(*needles):
 resolved = {}
 # Prefer explicit harness defaults; only overwrite REPLACE_ME placeholders.
 defaults = {
-    "big": "openai/gpt-5.6-sol:ultra",
+    "big": "openai-codex/gpt-5.6-sol:ultra",  # ultra only on sol/terra
     "medium": "xai/grok-4.5:high",  # Grok always high effort
-    "small": "openai/gpt-5.6-sol:low",
+    "small": "openai-codex/gpt-5.6-luna:low",
 }
 tier_map = document.get("tiers") if isinstance(document.get("tiers"), dict) else document
 if not isinstance(tier_map, dict):
@@ -771,7 +957,7 @@ for key, default_id in defaults.items():
 for key, needles in (
     ("big", ("gpt-5.6-sol", "sol")),
     ("medium", ("grok-4.5", "grok")),
-    ("small", ("gpt-5.6-sol", "sol")),
+    ("small", ("gpt-5.6-luna", "luna")),
 ):
     found = pick_model(*needles[:1]) or pick_model(needles[-1])
     if found and key in defaults:
@@ -961,7 +1147,7 @@ PY
       _caveman_node_shim=""
       if { ! command -v node >/dev/null 2>&1 || ! command -v npx >/dev/null 2>&1; } \
         && command -v bun >/dev/null 2>&1; then
-        _caveman_node_shim=$(mktemp -d "${TMPDIR:-/tmp}/caveman-node.XXXXXX")
+        _caveman_node_shim=$(mktemp -d "''${TMPDIR:-/tmp}/caveman-node.XXXXXX")
         if ! command -v node >/dev/null 2>&1; then
           printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_caveman_node_shim/node"
           chmod +x "$_caveman_node_shim/node"
@@ -1066,7 +1252,7 @@ PY
       if command -v pi >/dev/null 2>&1; then
         _ponytail_pi_shim=""
         if ! command -v npm >/dev/null 2>&1 && command -v bun >/dev/null 2>&1; then
-          _ponytail_pi_shim=$(mktemp -d "${TMPDIR:-/tmp}/ponytail-pi.XXXXXX")
+          _ponytail_pi_shim=$(mktemp -d "''${TMPDIR:-/tmp}/ponytail-pi.XXXXXX")
           # pi's git install runs `npm install`; bun is npm-compatible enough here.
           printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_ponytail_pi_shim/npm"
           chmod +x "$_ponytail_pi_shim/npm"
@@ -1089,7 +1275,7 @@ PY
       _ponytail_node_shim=""
       if { ! command -v node >/dev/null 2>&1 || ! command -v npx >/dev/null 2>&1; } \
         && command -v bun >/dev/null 2>&1; then
-        _ponytail_node_shim=$(mktemp -d "${TMPDIR:-/tmp}/ponytail-node.XXXXXX")
+        _ponytail_node_shim=$(mktemp -d "''${TMPDIR:-/tmp}/ponytail-node.XXXXXX")
         if ! command -v node >/dev/null 2>&1; then
           printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_ponytail_node_shim/node"
           chmod +x "$_ponytail_node_shim/node"
@@ -1112,18 +1298,22 @@ PY
         rm -rf "$_ponytail_node_shim"
       fi
 
-      # Always seed portable skill files under ~/.agents/skills (and project if present)
+      # Portable skill files for non-Pi agents only. Do NOT seed project
+      # .agents/skills/ponytail* — Pi auto-loads project skills and collides with
+      # git:github.com/DietrichGebert/ponytail (package is SoT for Pi).
       mkdir -p "$HOME/.agents/skills"
       if install_ponytail_skill_files "$HOME/.agents/skills"; then
-        ok "ponytail: skill files in ~/.agents/skills"
+        ok "ponytail: skill files in ~/.agents/skills (portable; excluded from pi settings)"
         _ponytail_any=1
       fi
-      if [ -d ".agents/skills" ] || [ -d ".agents" ]; then
-        mkdir -p ".agents/skills"
-        if install_ponytail_skill_files ".agents/skills"; then
-          ok "ponytail: skill files in .agents/skills"
-          _ponytail_any=1
-        fi
+      # Drop accidental project copies that cause Skill conflicts in this repo
+      if [ -d ".agents/skills" ]; then
+        for _pt in ponytail ponytail-review ponytail-audit ponytail-debt ponytail-gain ponytail-help; do
+          if [ -e ".agents/skills/$_pt" ]; then
+            rm -rf ".agents/skills/$_pt"
+            log "removed project .agents/skills/$_pt (use pi package / ~/.agents/skills)"
+          fi
+        done
       fi
 
       if [ "$_ponytail_any" -eq 1 ]; then
