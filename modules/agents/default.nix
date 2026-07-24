@@ -18,6 +18,10 @@ let
   # codex must NEVER use wrap_bun_cli — that made Codex think it was npm-managed
   # and could write-through-symlink clobber ~/.codex/packages/standalone/.../bin/codex.
   # Prefer ~/.local/bin so GUI / minimal-PATH agent shells still find tools.
+  # OMP binary only — configuration belongs to ~/.dotfiles/omp (not Nix home.file).
+  installOmpScript = pkgs.writeShellScript "install-omp" (
+    builtins.readFile ./scripts/install-omp.sh
+  );
   installScript = pkgs.writeShellScript "install-agent-tools" ''
     set +e
     export PATH="$HOME/.local/bin:${pkgs.bun}/bin:${pkgs.uv}/bin:${pkgs.curl}/bin:${pkgs.bash}/bin:${pkgs.python3}/bin:$HOME/.bun/bin:$HOME/.cargo/bin:/opt/zerobrew/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
@@ -692,6 +696,15 @@ PY
       else
         fail "grok install failed — curl -fsSL https://x.ai/cli/install.sh | bash"
       fi
+    fi
+
+    # OMP binary only. Configuration belongs to ~/.dotfiles/omp.
+    # Provider order: ZeroBrew → Homebrew can1357/tap/omp → https://omp.sh/install
+    # Keep Pi runtime until Stage 3/4 parity gates pass.
+    if ${installOmpScript}; then
+      ok "omp present ($(omp --version 2>/dev/null | head -1 || echo ok))"
+    else
+      fail "omp install failed — ZeroBrew → Homebrew can1357/tap/omp → https://omp.sh/install"
     fi
 
     # --- pi coding agent (https://pi.dev) via bun only ---

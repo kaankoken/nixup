@@ -88,7 +88,8 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 | **uv** | **headroom** — `uv tool install "headroom-ai[proxy,ml,code,mcp,evals]"`; **browser-use** — `uv tool install browser-use` (Chrome CDP; modules/agents). Soft: **webwright** skill clone → `~/.agents/skills/webwright` |
 | **Manual** | Microsoft Outlook, Codex desktop |
 | **Activation (curl)** | rustup, claude-code, **codex** (standalone via `chatgpt.com/codex/install.sh`; purges legacy bun/npm wrappers), **rtk** (→ `~/.local/bin`), **beads**, **grok**, **caveman** (skill installer; needs Node ≥18), **ponytail** (skill/plugin multi-path: Claude/Codex/pi + portable `~/.agents/skills`) |
-| **Activation (bun)** | **pi** only (`bun install -g`; wrappers in `~/.local/bin`) — **never codex**. Pi goal harness also installs **`@quintinshaw/pi-dynamic-workflows`** + **`pi-mcp-adapter`** (fail-soft; see `modules/agents/pi/`) |
+| **Activation (OMP binary)** | **omp** only — ZeroBrew → Homebrew `can1357/tap/omp` → `curl -fsSL https://omp.sh/install \| sh` via `modules/agents/scripts/install-omp.sh`. **No** `.omp` config from Nix; config lives in `~/.dotfiles/omp` |
+| **Activation (bun)** | **pi** only (`bun install -g`; wrappers in `~/.local/bin`) — **never codex**. Pi goal harness also installs **`@quintinshaw/pi-dynamic-workflows`** + **`pi-mcp-adapter`** (fail-soft; see `modules/agents/pi/`). Pi retained until OMP Stage 3/4 parity |
 
 ### Sources of truth
 
@@ -103,7 +104,8 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 | headroom | **uv** only |
 | browser-use | **uv tool** (multi-device via activation); Chrome remote debugging for doctor |
 | webwright | skill symlink under `~/.agents/skills` (optional long-horizon web) |
-| pi | **bun** global (`bun install -g …`); wrappers in `~/.local/bin` — **no Node/npm** |
+| omp | **binary only** via activation (`install-omp.sh`); config in `~/.dotfiles/omp` — **not** Nix `home.file` |
+| pi | **bun** global (`bun install -g …`); wrappers in `~/.local/bin` — **no Node/npm** (kept until OMP Stage 3/4) |
 | Ghostty / Zed / Signal / Slack / WhatsApp | Nix home packages |
 | zellij | Flake input [kaankoken/zellij](https://github.com/kaankoken/zellij) (`main`) via `overlays.default` |
 | Outlook | Manual |

@@ -5,6 +5,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INSTALLER="$ROOT/modules/agents/scripts/install-omp.sh"
+PATH_BASE="${PATH}"
 FAIL=0
 PASS=0
 
@@ -320,6 +321,52 @@ case7() {
   rm -rf "$d"
 }
 
+# --- Nix ownership: installer wired; no OMP config via home.file ---
+case_nix_ownership() {
+  # Restore PATH — earlier harness cases leave only /usr/bin:/bin
+  export PATH="${PATH_BASE:-/usr/bin:/bin}:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+  local nix="$ROOT/modules/agents/default.nix"
+  if [[ ! -f "$nix" ]]; then
+    echo "FAIL nix_file_missing"
+    FAIL=$((FAIL + 1))
+    return
+  fi
+  if command -v rg >/dev/null 2>&1; then
+    if rg -q 'install-omp\.sh|installOmpScript|writeShellScript "install-omp"' "$nix"; then
+      echo "PASS nix_wires_install_omp"
+      PASS=$((PASS + 1))
+    else
+      echo "FAIL nix_wires_install_omp (missing install-omp wiring in default.nix)"
+      FAIL=$((FAIL + 1))
+    fi
+    # Must never deploy ~/.omp/* config via home.file (avoid false + on "prompts")
+    if rg -q 'home\.file\.[^ ]*\.omp|home\.file = \{[^}]*\.omp|"\.omp/agent|"\.omp/' "$nix" \
+      || rg -q 'home\.file\."\.omp' "$nix"; then
+      echo "FAIL nix_no_omp_config_deploy (Nix must not deploy .omp config)"
+      FAIL=$((FAIL + 1))
+    else
+      echo "PASS nix_no_omp_config_deploy"
+      PASS=$((PASS + 1))
+    fi
+  else
+    # Fallback without rg
+    if grep -Eq 'install-omp\.sh|installOmpScript|writeShellScript "install-omp"' "$nix"; then
+      echo "PASS nix_wires_install_omp"
+      PASS=$((PASS + 1))
+    else
+      echo "FAIL nix_wires_install_omp"
+      FAIL=$((FAIL + 1))
+    fi
+    if grep -Eq 'home\.file\."\.omp|"\.omp/agent' "$nix"; then
+      echo "FAIL nix_no_omp_config_deploy"
+      FAIL=$((FAIL + 1))
+    else
+      echo "PASS nix_no_omp_config_deploy"
+      PASS=$((PASS + 1))
+    fi
+  fi
+}
+
 echo "=== test-omp-installer ==="
 case1
 case2
@@ -328,6 +375,7 @@ case4
 case5
 case6
 case7
+case_nix_ownership
 
 echo "=== summary pass=$PASS fail=$FAIL ==="
 if [[ "$FAIL" -ne 0 ]]; then
