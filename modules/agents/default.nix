@@ -13,7 +13,7 @@ let
   # ponytail, context-mode, context7, ast-grep (Nix). Code graph = tokensave only
   # (codebase-memory is stripped on activate).
   #
-  # No system Node/npm for agent runtimes we control: pi / context-mode via bun.
+  # No system Node/npm for agent runtimes we control: context-mode via bun.
   # codex / rtk / grok / claude / beads / caveman / ponytail: official installers.
   # codex must NEVER use wrap_bun_cli — that made Codex think it was npm-managed
   # and could write-through-symlink clobber ~/.codex/packages/standalone/.../bin/codex.
@@ -153,8 +153,7 @@ let
 
     # Global bun package + ~/.local/bin wrapper that runs the entry under bun
     # (packages ship #!/usr/bin/env node; we never put Node on PATH).
-    # ONLY for pure-JS CLIs that are NOT pi — never codex/rtk/bd/pi.
-    # pi uses install_pi_via_bun (isolated prefix; home package.json breaks bun -g).
+    # ONLY for pure-JS CLIs that are not standalone-installed — never codex/rtk/bd.
     install_bun_cli() {
       local package="$1"
       local bin_name="$2"
@@ -196,156 +195,7 @@ let
       return 0
     }
 
-    # Pi: never use bare `bun install -g` from $HOME — package.json there hijacks
-    # global installs into ~/node_modules and breaks `pi update` self-detect.
-    # Isolated prefix: ~/.local/share/nix-setup/pi + dedicated wrapper with update.
-    PI_BUN_PREFIX="$HOME/.local/share/nix-setup/pi"
-    pi_cli_js() {
-      printf '%s\n' "$PI_BUN_PREFIX/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
-    }
-
-    install_pi_via_bun() {
-      local cli
-      require_bun || return 1
-      mkdir -p "$PI_BUN_PREFIX" "$HOME/.local/bin" "$HOME/.bun/bin"
-      if [ ! -f "$PI_BUN_PREFIX/package.json" ]; then
-        printf '%s\n' \
-          '{' \
-          '  "name": "nix-setup-pi",' \
-          '  "private": true' \
-          '}' >"$PI_BUN_PREFIX/package.json"
-      fi
-      log "bun add @earendil-works/pi-coding-agent in $PI_BUN_PREFIX"
-      if ! (
-        cd "$PI_BUN_PREFIX" || exit 1
-        bun add "@earendil-works/pi-coding-agent@latest" 2>/dev/null \
-          || bun add "@earendil-works/pi-coding-agent"
-      ); then
-        fail "bun add pi-coding-agent failed in $PI_BUN_PREFIX"
-        return 1
-      fi
-      cli=$(pi_cli_js)
-      if [ ! -f "$cli" ]; then
-        fail "pi cli.js missing at $cli"
-        return 1
-      fi
-      # Keep ~/.bun/bin/pi pointing at isolated install (not ~/node_modules)
-      ln -sfn "$cli" "$HOME/.bun/bin/pi"
-      wrap_pi_cli
-      return 0
-    }
-
-    wrap_pi_cli() {
-      local dest="$HOME/.local/bin/pi"
-      local cli
-      cli=$(pi_cli_js)
-      mkdir -p "$HOME/.local/bin"
-      # Write wrapper; Nix-safe (no unescaped ''${...} in shell body).
-      cat >"$dest" <<'PIWRAP'
-#!/bin/sh
-# Managed by nix-setup modules/agents — Pi via isolated bun prefix (no system Node).
-# `pi update` is handled here because stock self-update expects npm/bun global layouts.
-export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
-PI_PREFIX="$HOME/.local/share/nix-setup/pi"
-PI_CLI="$PI_PREFIX/node_modules/@earendil-works/pi-coding-agent/dist/cli.js"
-
-if [ ! -f "$PI_CLI" ]; then
-  echo "pi: missing $PI_CLI — run nixup apply / agents activation" >&2
-  exit 127
-fi
-
-pi_self_update() {
-  echo "Updating pi (@earendil-works/pi-coding-agent) via bun (nix-setup)…"
-  mkdir -p "$PI_PREFIX"
-  if [ ! -f "$PI_PREFIX/package.json" ]; then
-    printf '%s\n' '{' '  "name": "nix-setup-pi",' '  "private": true' '}' >"$PI_PREFIX/package.json"
-  fi
-  (
-    cd "$PI_PREFIX" || exit 1
-    bun add "@earendil-works/pi-coding-agent@latest" 2>/dev/null \
-      || bun add "@earendil-works/pi-coding-agent"
-  ) || return 1
-  if [ -f "$PI_CLI" ]; then
-    ln -sfn "$PI_CLI" "$HOME/.bun/bin/pi" 2>/dev/null || true
-  fi
-  echo "pi now: $(bun "$PI_CLI" --version 2>/dev/null || echo unknown)"
-  return 0
-}
-
-pi_update_extensions() {
-  echo "Updating pi packages (dynamic-workflows, mcp-adapter, ponytail, chrome-cdp)…"
-  (
-    cd /tmp || exit 1
-    bun "$PI_CLI" install "npm:@quintinshaw/pi-dynamic-workflows" || true
-    bun "$PI_CLI" install "npm:pi-mcp-adapter" || true
-    bun "$PI_CLI" install "git:github.com/DietrichGebert/ponytail" || true
-    bun "$PI_CLI" install "git:github.com/pasky/chrome-cdp-skill" || true
-  )
-  echo "Package update finished (per-package soft-fail)."
-  return 0
-}
-
-if [ "''${1:-}" = "update" ]; then
-  shift
-  do_self=0
-  do_ext=0
-  do_models=0
-  if [ "$#" -eq 0 ]; then
-    do_self=1
-  fi
-  for a in "$@"; do
-    case "$a" in
-      --all|all) do_self=1; do_ext=1 ;;
-      --self|self|pi) do_self=1 ;;
-      --extensions|--packages|extensions|packages)
-        do_ext=1
-        if [ "$#" -eq 1 ]; then do_self=0; fi
-        ;;
-      --models|models)
-        do_models=1
-        if [ "$#" -eq 1 ]; then do_self=0; fi
-        ;;
-      -*)
-        ;;
-      *)
-        exec bun "$PI_CLI" update "$@"
-        ;;
-    esac
-  done
-  rc=0
-  if [ "$do_self" -eq 1 ]; then
-    pi_self_update || rc=1
-  fi
-  if [ "$do_ext" -eq 1 ]; then
-    pi_update_extensions || rc=1
-  fi
-  if [ "$do_models" -eq 1 ]; then
-    ( cd /tmp && bun "$PI_CLI" update --models ) || rc=1
-  fi
-  if [ "$do_self" -eq 1 ] && [ "$do_ext" -eq 0 ] && [ "$do_models" -eq 0 ]; then
-    echo "Extensions are skipped. Run: pi update --extensions"
-  fi
-  exit "$rc"
-fi
-
-exec bun "$PI_CLI" "$@"
-PIWRAP
-      chmod +x "$dest"
-      export PATH="$HOME/.local/bin:$PATH"
-      log "pi wrapper $dest -> $cli"
-      return 0
-    }
-
-    pi_install_healthy() {
-      local cli
-      cli=$(pi_cli_js)
-      [ -f "$cli" ] || return 1
-      [ -x "$HOME/.local/bin/pi" ] || return 1
-      # Reject legacy wrap_bun_cli / home node_modules layout
-      grep -qE 'local/share/nix-setup/pi|nix-setup-pi' "$HOME/.local/bin/pi" 2>/dev/null || return 1
-      "$HOME/.local/bin/pi" --version >/dev/null 2>&1 || return 1
-      return 0
-    }
+    # Pi binary installer removed (Stage 4 complete; OMP only).
 
     # --- codex helpers (standalone only; never bun/npm) ---
     codex_standalone_entrypoint() {
@@ -454,96 +304,7 @@ PIWRAP
       fi
     fi
 
-    # --- npm shim (bun) for pi package manager when real npm is absent ---
-    # Pi spawns `npm install PKG --prefix ~/.pi/agent/npm`. Plain `bun "$@"` also mutates
-    # CWD package.json (pollutes ~/package.json / .dotfiles with duplicate pi-extensions).
-    # This Python shim: honor --prefix by chdir+bun add there; never write home package.json.
-    mkdir -p "$HOME/.local/bin"
-    if command -v bun >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
-      if ! command -v npm >/dev/null 2>&1 \
-        || grep -Fq 'Managed by nix-setup modules/agents' "$HOME/.local/bin/npm" 2>/dev/null \
-        || grep -Fq 'isolate --prefix installs' "$HOME/.local/bin/npm" 2>/dev/null; then
-        cat >"$HOME/.local/bin/npm" <<'NPMSHIM'
-#!/usr/bin/env python3
-"""Managed by nix-setup modules/agents — bun-as-npm for pi; isolate --prefix installs."""
-from __future__ import annotations
-
-import os
-import subprocess
-import sys
-
-
-def main() -> int:
-    args = sys.argv[1:]
-    prefix: str | None = None
-    filtered: list[str] = []
-    i = 0
-    while i < len(args):
-        if args[i] == "--prefix" and i + 1 < len(args):
-            prefix = args[i + 1]
-            i += 2
-            continue
-        if args[i] == "--legacy-peer-deps":
-            i += 1
-            continue
-        filtered.append(args[i])
-        i += 1
-
-    bun = "bun"
-    env = os.environ.copy()
-    local_bin = os.path.expanduser("~/.local/bin")
-    bun_bin = os.path.expanduser("~/.bun/bin")
-    env["PATH"] = os.pathsep.join(
-        [local_bin, bun_bin] + env.get("PATH", "").split(os.pathsep)
-    )
-
-    if prefix:
-        os.makedirs(prefix, exist_ok=True)
-        if filtered and filtered[0] == "install":
-            pkgs = [a for a in filtered[1:] if not a.startswith("-")]
-            flags = [a for a in filtered[1:] if a.startswith("-")]
-            cmd = [bun, "add", *pkgs, *flags] if pkgs else [bun, "install", *flags]
-        else:
-            cmd = [bun, *filtered]
-        return subprocess.call(cmd, cwd=prefix, env=env)
-
-    home = os.path.expanduser("~")
-    cwd = os.getcwd()
-    home_pkg = os.path.join(home, "package.json")
-    cwd_pkg = os.path.join(cwd, "package.json")
-    try:
-        same_as_home = (
-            os.path.exists(cwd_pkg)
-            and os.path.exists(home_pkg)
-            and os.path.samefile(cwd_pkg, home_pkg)
-        )
-    except OSError:
-        same_as_home = False
-    if cwd == home or same_as_home:
-        run_dir = os.path.join(home, ".pi", "agent", "run")
-        os.makedirs(run_dir, exist_ok=True)
-        run_pkg = os.path.join(run_dir, "package.json")
-        if not os.path.isfile(run_pkg):
-            with open(run_pkg, "w", encoding="utf-8") as handle:
-                handle.write('{\n  "name": "pi-agent-run",\n  "private": true\n}\n')
-        cwd = run_dir
-    return subprocess.call([bun, *filtered], cwd=cwd, env=env)
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-NPMSHIM
-        chmod +x "$HOME/.local/bin/npm"
-        export PATH="$HOME/.local/bin:$PATH"
-        ok "npm shim → bun (prefix-isolated) at ~/.local/bin/npm"
-      else
-        ok "npm present ($(command -v npm))"
-      fi
-    else
-      skip "npm shim skipped — need bun + python3"
-    fi
-
-    # Repair pollution from older pi/bun runs (pi-coding-agent + extensions in home package.json).
+    # Repair leftover package.json deps from retired agent installers.
     python3 - <<'PY' || true
 import json
 from pathlib import Path
@@ -700,305 +461,14 @@ PY
 
     # OMP binary only. Configuration belongs to ~/.dotfiles/omp.
     # Provider order: ZeroBrew → Homebrew can1357/tap/omp → https://omp.sh/install
-    # Keep Pi runtime until Stage 3/4 parity gates pass.
     if ${installOmpScript}; then
       ok "omp present ($(omp --version 2>/dev/null | head -1 || echo ok))"
     else
       fail "omp install failed — ZeroBrew → Homebrew can1357/tap/omp → https://omp.sh/install"
     fi
 
-    # --- pi coding agent (https://pi.dev) via bun only ---
-    # Isolated prefix ~/.local/share/nix-setup/pi — bare bun -g hijacks via ~/package.json.
-    # Official install.sh wants Node; we never use it.
-    if pi_install_healthy; then
-      wrap_pi_cli || true
-      ok "pi healthy ($(pi --version 2>/dev/null | head -1 || echo ok))"
-    else
-      log "installing/repairing pi via bun (isolated prefix)..."
-      if install_pi_via_bun; then
-        ok "pi via bun ($(pi --version 2>/dev/null | head -1 || echo ok))"
-      else
-        fail "pi install failed — install_pi_via_bun @earendil-works/pi-coding-agent"
-      fi
-    fi
 
-    # --- pi goal harness: packages, settings merge, workflow templates, model tiers ---
-    # Templates from home.file: ~/.pi/agent/settings.harness.json, agents/, prompts/, skills/,
-    # ~/.pi/workflows/templates/. Never touch auth.json.
-    if command -v pi >/dev/null 2>&1; then
-      log "pi harness: installing dynamic-workflows + MCP adapter (fail-soft)..."
-      _pi_harness_shim=""
-      if ! command -v npm >/dev/null 2>&1 && command -v bun >/dev/null 2>&1; then
-        _pi_harness_shim=$(mktemp -d "''${TMPDIR:-/tmp}/pi-harness-npm.XXXXXX")
-        printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_pi_harness_shim/npm"
-        chmod +x "$_pi_harness_shim/npm"
-        export PATH="$_pi_harness_shim:$PATH"
-      fi
-      if pi install npm:@quintinshaw/pi-dynamic-workflows 2>/dev/null \
-        || pi install npm:@quintinshaw/pi-dynamic-workflows@latest 2>/dev/null; then
-        ok "pi-dynamic-workflows installed"
-      else
-        fail "pi-dynamic-workflows install failed — pi install npm:@quintinshaw/pi-dynamic-workflows"
-      fi
-      if pi install npm:pi-mcp-adapter 2>/dev/null \
-        || pi install npm:@earendil-works/pi-mcp-adapter 2>/dev/null \
-        || pi install npm:pi-mcp-extension 2>/dev/null; then
-        ok "pi MCP adapter installed"
-      else
-        fail "pi MCP adapter install failed — try pi install npm:pi-mcp-adapter"
-      fi
-      # Ponytail for Pi is the official package (not only portable ~/.agents/skills copies)
-      if pi install git:github.com/DietrichGebert/ponytail 2>/dev/null \
-        || pi install https://github.com/DietrichGebert/ponytail 2>/dev/null; then
-        ok "ponytail pi package installed (git:github.com/DietrichGebert/ponytail)"
-      else
-        skip "ponytail pi package install failed — pi install git:github.com/DietrichGebert/ponytail"
-      fi
-      # Web tiers: CDP/headless (optional browser path for web-browse-scout)
-      if pi install git:github.com/pasky/chrome-cdp-skill 2>/dev/null \
-        || pi install https://github.com/pasky/chrome-cdp-skill 2>/dev/null; then
-        ok "pi chrome-cdp skill installed (web-browse-scout)"
-      else
-        skip "chrome-cdp skill — web-browse-scout soft-fails until installed"
-      fi
-      # browser-use / webwright installed earlier in activation (shared multi-device stack)
-      if command -v browser-use >/dev/null 2>&1 || [ -x "$HOME/.local/bin/browser-use" ]; then
-        ok "browser-use on PATH for pi harness (Chrome CDP — enable chrome://inspect/#remote-debugging if doctor fails)"
-      else
-        skip "browser-use missing for pi harness (see earlier install step)"
-      fi
-      if [ -f "$HOME/.agents/skills/webwright/SKILL.md" ]; then
-        ok "webwright skill available for pi (~/.agents/skills/webwright)"
-      else
-        skip "webwright skill not linked"
-      fi
-      if [ -n "$_pi_harness_shim" ]; then
-        rm -rf "$_pi_harness_shim"
-      fi
-
-      # Merge settings.harness.json → settings.json (preserve theme/lastChangelogVersion/rtk)
-      python3 - <<'PY' || fail "pi settings merge failed"
-import json
-from pathlib import Path
-home = Path.home()
-agent = home / ".pi" / "agent"
-settings_path = agent / "settings.json"
-harness_path = agent / "settings.harness.json"
-data = {}
-if settings_path.is_file():
-    try:
-        data = json.loads(settings_path.read_text())
-    except Exception:
-        data = {}
-if not isinstance(data, dict):
-    data = {}
-harness = {}
-if harness_path.is_file():
-    try:
-        harness = json.loads(harness_path.read_text())
-    except Exception:
-        harness = {}
-# packages: ensure required sources present; drop ponytail git pkg if portable skills exist
-packages = data.get("packages")
-if not isinstance(packages, list):
-    packages = []
-wanted = [
-    "npm:@quintinshaw/pi-dynamic-workflows",
-    "npm:pi-mcp-adapter",
-    "git:github.com/DietrichGebert/ponytail",
-    "git:github.com/pasky/chrome-cdp-skill",
-]
-# Ponytail for Pi is the git package (pi install git:github.com/DietrichGebert/ponytail).
-# Keep it; do not strip even if portable ~/.agents/skills copies exist for other agents.
-for src in wanted:
-    if not any(
-        (isinstance(p, str) and src in p)
-        or (isinstance(p, dict) and src in str(p.get("source", "")))
-        for p in packages
-    ):
-        packages.append(src)
-data["packages"] = packages
-# Skills: portable tree + harness skills. Exclude portable ponytail* when pi package
-# provides ponytail (avoids triple collision with package + ~/.agents + project).
-skills = [
-    "~/.agents/skills",
-    "!~/.agents/skills/ponytail",
-    "!~/.agents/skills/ponytail-*",
-    "~/.pi/agent/skills",
-]
-if isinstance(harness.get("skills"), list) and harness["skills"]:
-    safe = []
-    for s in harness["skills"]:
-        ss = str(s)
-        if ".claude" in ss and "plugins/cache" in ss:
-            continue
-        if ss.endswith("/.claude/skills") or "/.claude/skills" in ss:
-            continue
-        if ss not in safe:
-            safe.append(ss)
-    if safe:
-        skills = safe
-    if "~/.agents/skills" not in skills:
-        skills.insert(0, "~/.agents/skills")
-    # Always exclude portable ponytail dirs when package is installed
-    if any("ponytail" in str(p).lower() for p in packages):
-        for ex in ("!~/.agents/skills/ponytail", "!~/.agents/skills/ponytail-*"):
-            if ex not in skills:
-                skills.append(ex)
-    if "~/.pi/agent/skills" not in skills and str(agent / "skills") not in skills:
-        skills.append("~/.pi/agent/skills")
-data["skills"] = skills
-print("pi skills paths:", skills)
-# Always prefer harness model selection (catalog uses openai-codex, not openai).
-for key in (
-    "enableSkillCommands",
-    "defaultThinkingLevel",
-    "quietStartup",
-    "defaultProvider",
-    "defaultModel",
-    "enabledModels",
-    "grokEffort",
-):
-    if key in harness:
-        data[key] = harness[key]
-if "compaction" in harness:
-    data["compaction"] = harness["compaction"]
-# extensions: keep rtk; merge harness extensions
-ext = data.get("extensions")
-if not isinstance(ext, list):
-    ext = []
-for e in harness.get("extensions") or ["extensions/rtk.ts"]:
-    if e not in ext:
-        ext.append(e)
-data["extensions"] = ext
-agent.mkdir(parents=True, exist_ok=True)
-settings_path.write_text(json.dumps(data, indent=2) + "\n")
-print("merged", settings_path)
-# Drop HM backup skill dirs (*.pre-hm) — Pi treats them as skills and collides.
-skills_root = agent / "skills"
-if skills_root.is_dir():
-    import shutil
-    for child in skills_root.iterdir():
-        name = child.name
-        if name.endswith(".pre-hm") or name.endswith(".hm-bak") or ".pre-hm" in name:
-            try:
-                if child.is_dir():
-                    shutil.rmtree(child)
-                else:
-                    child.unlink()
-                print("removed skill backup", child)
-            except Exception as exc:
-                print("skill backup remove failed", child, exc)
-PY
-      ok "pi settings.harness merged into settings.json"
-
-      # Deploy workflow templates + model-tiers (package may re-read later)
-      mkdir -p "$HOME/.pi/workflows/saved" "$HOME/.pi/workflows/templates"
-      if [ -d "$HOME/.pi/workflows/templates" ]; then
-        # home.file already places templates; also copy JS into saved-friendly names
-        for wf in goal-harness research-fanout milestone-review; do
-          if [ -f "$HOME/.pi/workflows/templates/''${wf}.js" ]; then
-            cp -f "$HOME/.pi/workflows/templates/''${wf}.js" "$HOME/.pi/workflows/saved/''${wf}.js" 2>/dev/null \
-              || cp -f "$HOME/.pi/workflows/templates/''${wf}.js" "$HOME/.pi/workflows/''${wf}.js" 2>/dev/null \
-              || true
-          fi
-        done
-        if [ -f "$HOME/.pi/workflows/templates/model-tiers.json" ]; then
-          if [ ! -f "$HOME/.pi/workflows/model-tiers.json" ]; then
-            cp -f "$HOME/.pi/workflows/templates/model-tiers.json" "$HOME/.pi/workflows/model-tiers.json" || true
-          fi
-        fi
-      fi
-      ok "pi workflow templates staged under ~/.pi/workflows"
-
-      # Soft model-tier resolve: only fill REPLACE_ME when a model catalog is visible
-      python3 - <<'PY' || true
-import json, re, subprocess
-from pathlib import Path
-home = Path.home()
-tiers_path = home / ".pi" / "workflows" / "model-tiers.json"
-aliases_path = home / ".pi" / "agent" / "models-aliases.json"
-if not tiers_path.is_file():
-    raise SystemExit(0)
-try:
-    document = json.loads(tiers_path.read_text())
-except Exception:
-    raise SystemExit(0)
-catalog = ""
-for command_argv in (
-    ["pi", "models", "--list"],
-    ["pi", "--list-models"],
-    ["pi", "list"],
-):
-    try:
-        process_result = subprocess.run(
-            command_argv, capture_output=True, text=True, timeout=15
-        )
-        catalog += (process_result.stdout or "") + "\n" + (process_result.stderr or "")
-    except Exception:
-        pass
-
-def pick_model(*needles):
-    for line in catalog.splitlines():
-        lowered = line.lower()
-        if all(needle in lowered for needle in needles):
-            match = re.search(r"([a-z0-9._-]+/[a-z0-9._:+-]+)", line, re.I)
-            if match:
-                return match.group(1).strip()
-            return line.strip()
-    return None
-
-resolved = {}
-# Prefer explicit harness defaults; only overwrite REPLACE_ME placeholders.
-defaults = {
-    "big": "openai-codex/gpt-5.6-sol:ultra",  # ultra only on sol/terra
-    "medium": "xai/grok-4.5:high",  # Grok always high effort
-    "small": "openai-codex/gpt-5.6-luna:low",
-}
-tier_map = document.get("tiers") if isinstance(document.get("tiers"), dict) else document
-if not isinstance(tier_map, dict):
-    print("model tiers: unexpected shape")
-    raise SystemExit(0)
-changed = False
-for key, default_id in defaults.items():
-    current = str(tier_map.get(key, ""))
-    if current.startswith("REPLACE_ME") or not current:
-        tier_map[key] = default_id
-        resolved[key] = default_id
-        changed = True
-# Soft upgrade from catalog if fuzzy match looks better (optional)
-for key, needles in (
-    ("big", ("gpt-5.6-sol", "sol")),
-    ("medium", ("grok-4.5", "grok")),
-    ("small", ("gpt-5.6-luna", "luna")),
-):
-    found = pick_model(*needles[:1]) or pick_model(needles[-1])
-    if found and key in defaults:
-        # keep effort suffix from defaults when catalog omits it
-        if ":" not in found and ":" in defaults[key]:
-            found = found + ":" + defaults[key].split(":")[-1]
-        if found != tier_map.get(key):
-            # only replace if still default/placeholder
-            if str(tier_map.get(key, "")).startswith("REPLACE_ME"):
-                tier_map[key] = found
-                resolved[key] = found
-                changed = True
-if "tiers" in document:
-    document["tiers"] = tier_map
-else:
-    document = {"tiers": tier_map}
-if changed:
-    tiers_path.write_text(json.dumps(document, indent=2) + "\n")
-    print("model tiers set:", tier_map)
-else:
-    print("model tiers unchanged:", tier_map)
-PY
-      ok "pi model-tier resolve attempted (soft)"
-    else
-      skip "pi harness packages — pi not on PATH"
-    fi
-
-    # --- beads (official native binary; do NOT use bun/npm @beads/bd or crates.io) ---
+pm @beads/bd or crates.io) ---
     # https://github.com/gastownhall/beads — install.sh → ~/.local/bin/bd
     # bun/npm package only ships a node wrapper; postinstall often fails without node.
     # crates.io "beads" is a library stub with no binary.
@@ -1072,11 +542,10 @@ PY
     # --- RTK multi-agent hooks (binary already ensured above) ---
     # https://github.com/rtk-ai/rtk
     if command -v rtk >/dev/null 2>&1; then
-      log "rtk init for claude / codex / cursor / pi (auto-patch where supported)..."
+      log "rtk init for claude / codex / cursor (auto-patch where supported)..."
       rtk init -g --auto-patch 2>/dev/null && ok "rtk init claude" || fail "rtk init claude"
       rtk init -g --codex 2>/dev/null && ok "rtk init codex" || fail "rtk init codex"
       rtk init -g --agent cursor --auto-patch 2>/dev/null && ok "rtk init cursor" || fail "rtk init cursor"
-      rtk init -g --agent pi --auto-patch 2>/dev/null && ok "rtk init pi" || fail "rtk init pi"
     else
       fail "rtk missing — cannot run rtk init"
     fi
@@ -1098,7 +567,7 @@ PY
       ok "tokensave present ($(tokensave --version 2>/dev/null | head -1 || echo ok))"
     fi
     if command -v tokensave >/dev/null 2>&1; then
-      for agent in claude codex cursor pi grok; do
+      for agent in claude codex cursor grok; do
         if tokensave install --agent "$agent" --git-hook no 2>/dev/null; then
           ok "tokensave install --agent $agent"
         else
@@ -1203,11 +672,10 @@ PY
         || [ -d "$HOME/.agents/skills/ponytail" ] \
         || [ -d ".agents/skills/ponytail" ] \
         || [ -d "$HOME/.gemini/extensions/ponytail" ] \
-        || [ -d "$HOME/.pi/agent/git/github.com/DietrichGebert/ponytail" ]
     }
 
     # Portable skill tree → ~/.agents/skills (Grok, Cursor, generic skill hosts).
-    # Host plugins (Claude/Codex/pi) add hooks/commands; this keeps the skill readable everywhere.
+    # Host plugins (Claude/Codex) add hooks/commands; this keeps the skill readable everywhere.
     install_ponytail_skill_files() {
       local dest_root="$1"
       local skill name url
@@ -1261,29 +729,6 @@ PY
         fi
       fi
 
-      # pi package extension (needs npm for git installs; shim with bun when missing)
-      if command -v pi >/dev/null 2>&1; then
-        _ponytail_pi_shim=""
-        if ! command -v npm >/dev/null 2>&1 && command -v bun >/dev/null 2>&1; then
-          _ponytail_pi_shim=$(mktemp -d "''${TMPDIR:-/tmp}/ponytail-pi.XXXXXX")
-          # pi's git install runs `npm install`; bun is npm-compatible enough here.
-          printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_ponytail_pi_shim/npm"
-          chmod +x "$_ponytail_pi_shim/npm"
-          export PATH="$_ponytail_pi_shim:$PATH"
-        fi
-        if pi install git:github.com/DietrichGebert/ponytail 2>/dev/null \
-          || pi install https://github.com/DietrichGebert/ponytail 2>/dev/null \
-          || pi install npm:@dietrichgebert/ponytail 2>/dev/null; then
-          ok "ponytail: pi package installed"
-          _ponytail_any=1
-        else
-          skip "ponytail: pi install failed (needs npm or bun shim; portable skills still work)"
-        fi
-        if [ -n "$_ponytail_pi_shim" ]; then
-          rm -rf "$_ponytail_pi_shim"
-        fi
-      fi
-
       # skills CLI (global) — same bun→node shims as caveman when Node missing
       _ponytail_node_shim=""
       if { ! command -v node >/dev/null 2>&1 || ! command -v npx >/dev/null 2>&1; } \
@@ -1311,12 +756,10 @@ PY
         rm -rf "$_ponytail_node_shim"
       fi
 
-      # Portable skill files for non-Pi agents only. Do NOT seed project
-      # .agents/skills/ponytail* — Pi auto-loads project skills and collides with
-      # git:github.com/DietrichGebert/ponytail (package is SoT for Pi).
+      # Portable skill files for multi-agent hosts.
       mkdir -p "$HOME/.agents/skills"
       if install_ponytail_skill_files "$HOME/.agents/skills"; then
-        ok "ponytail: skill files in ~/.agents/skills (portable; excluded from pi settings)"
+        ok "ponytail: skill files in ~/.agents/skills (portable)"
         _ponytail_any=1
       fi
       # Drop accidental project copies that cause Skill conflicts in this repo
@@ -1324,7 +767,7 @@ PY
         for _pt in ponytail ponytail-review ponytail-audit ponytail-debt ponytail-gain ponytail-help; do
           if [ -e ".agents/skills/$_pt" ]; then
             rm -rf ".agents/skills/$_pt"
-            log "removed project .agents/skills/$_pt (use pi package / ~/.agents/skills)"
+            log "removed project .agents/skills/$_pt (use ~/.agents/skills)"
           fi
         done
       fi
@@ -1424,9 +867,6 @@ def merge_mcp_json(path):
 
 merge_mcp_json(home / ".claude" / ".mcp.json")
 merge_mcp_json(home / ".cursor" / "mcp.json")
-# Pi goal harness MCP (absolute commands preferred)
-merge_mcp_json(home / ".pi" / "agent" / "mcp.json")
-
 for claude_json in [home / ".claude" / ".claude.json", home / ".claude.json"]:
     if not claude_json.is_file():
         continue
@@ -1529,71 +969,8 @@ in
     python3
   ];
 
-  # Pi goal harness templates (modules/agents/pi/) → ~/.pi/agent and workflow templates.
-  # settings.json is NOT force-overwritten: ship settings.harness.json for activation merge.
-  # Never manage ~/.pi/agent/auth.json.
-  # force=true: allow re-apply after manual copies / prior activation staged regular files.
-  home.file = {
-    ".pi/agent/AGENTS.md" = {
-      source = ./pi/AGENTS.global.md;
-      force = true;
-    };
-    # mcp.json written by activation (absolute binary paths) — not home.file
-    ".pi/agent/mcp.harness.json" = {
-      source = ./pi/mcp.json;
-      force = true;
-    };
-    ".pi/agent/extensions/sandbox.json" = {
-      source = ./pi/sandbox.json;
-      force = true;
-    };
-    ".pi/agent/models-aliases.json" = {
-      source = ./pi/models-aliases.json;
-      force = true;
-    };
-    ".pi/agent/settings.harness.json" = {
-      source = ./pi/settings.json;
-      force = true;
-    };
-    ".pi/agent/agent-types.json" = {
-      source = ./pi/agent-types.json;
-      force = true;
-    };
-    ".pi/agent/README-harness.md" = {
-      source = ./pi/README.md;
-      force = true;
-    };
-    ".pi/agent/docs" = {
-      source = ./pi/docs;
-      recursive = true;
-      force = true;
-    };
-    ".pi/agent/agents" = {
-      source = ./pi/agents;
-      recursive = true;
-      force = true;
-    };
-    ".pi/agent/prompts" = {
-      source = ./pi/prompts;
-      recursive = true;
-      force = true;
-    };
-    ".pi/agent/skills/goal-harness" = {
-      source = ./pi/skills/goal-harness;
-      recursive = true;
-      force = true;
-    };
-    ".pi/agent/templates/project" = {
-      source = ./pi/templates/project;
-      recursive = true;
-      force = true;
-    };
-    ".pi/workflows/templates" = {
-      source = ./pi/workflows;
-      recursive = true;
-      force = true;
-    };
-  };
+  # OMP configuration is owned by ~/.dotfiles/omp (not Nix home.file).
+  home.file = { };
 
   home.activation.installAgentTools = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     echo "=== agent tools activation (fail-soft; shared stack: rtk/tokensave/headroom/context-mode/context7/caveman) ==="
