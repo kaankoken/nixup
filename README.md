@@ -85,10 +85,11 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 |---------|------|
 | **Nix** | CLI: nushell, starship, stow, neovim, **zellij** ([kaankoken/zellij](https://github.com/kaankoken/zellij) fork — kitty image protocol + yazi), **yazi**, atuin, lazygit, git UX (`difftastic`, `mergiraf`, `git-filter-repo`), modern CLIs (rg/fd/eza/…), Rust helpers (`bacon`, `cargo-nextest`; toolchain via rustup), **uv**, bun, zola, git, gh, cloudflared, fonts. **GUI (Darwin):** `ghostty-bin`, `zed-editor`, `signal-desktop`, `slack`, `whatsapp-for-mac` |
 | **Zerobrew → Homebrew fallback** (Mac) | **`mole`**: `zb install` then `brew install`. **`aerospace`**: `zb` then `brew install --cask nikitabobko/tap/aerospace`. Soft-fail if both fail |
-| **uv** | **headroom** — `uv tool install "headroom-ai[proxy,ml,code,mcp,evals]"` (modules/agents) |
+| **uv** | **headroom** — `uv tool install "headroom-ai[proxy,ml,code,mcp,evals]"`; **browser-use** — `uv tool install browser-use` (Chrome CDP; modules/agents). Soft: **webwright** skill clone → `~/.agents/skills/webwright` |
 | **Manual** | Microsoft Outlook, Codex desktop |
-| **Activation (curl)** | rustup, claude-code, **codex** (standalone via `chatgpt.com/codex/install.sh`; purges legacy bun/npm wrappers), **rtk** (→ `~/.local/bin`), **beads**, **grok**, **caveman** (skill installer; needs Node ≥18), **ponytail** (skill/plugin multi-path: Claude/Codex/pi + portable `~/.agents/skills`) |
-| **Activation (bun)** | **pi** only (`bun install -g`; wrappers in `~/.local/bin`) — **never codex** |
+| **Activation (curl)** | rustup, claude-code, **codex** (standalone via `chatgpt.com/codex/install.sh`; purges legacy bun/npm wrappers), **rtk** (→ `~/.local/bin`), **beads**, **grok**, **caveman** (skill installer; needs Node ≥18), **ponytail** (skill/plugin multi-path: Claude/Codex + portable `~/.agents/skills`) |
+| **Activation (OMP binary)** | **omp** only — ZeroBrew → Homebrew `can1357/tap/omp` → `curl -fsSL https://omp.sh/install \| sh` via `modules/agents/scripts/install-omp.sh`. **No** `.omp` config from Nix; config + goal harness live in `~/.dotfiles/omp` |
+| **Activation (bun)** | optional pure-JS CLIs (e.g. context-mode) — **never codex**. **Pi is not installed** (removed after Stage 4; see `scripts/test-no-pi-runtime.sh`) |
 
 ### Sources of truth
 
@@ -97,11 +98,13 @@ Replace these with your own hosts via `nixup.toml` + `nixup hosts sync`.
 | rtk | **curl** official install.sh → `~/.local/bin/rtk` (modules/agents); may symlink from brew/zerobrew if already native |
 | codex | **curl** standalone `https://chatgpt.com/codex/install.sh \| sh` → `~/.codex/packages/standalone` + `~/.local/bin/codex` (modules/agents); **not** bun/npm |
 | caveman | **curl** JuliusBrussee/caveman `install.sh` (multi-agent skill; Node ≥18) |
-| ponytail | **Claude/Codex plugins + pi package + portable skill files** DietrichGebert/ponytail (modules/agents) |
+| ponytail | **Claude/Codex plugins + portable skill files** DietrichGebert/ponytail (modules/agents) |
 | mole | zerobrew (`zb install mole`) — not Nix |
 | aerospace | zb if indexed; else **`brew install --cask nikitabobko/tap/aerospace`** |
 | headroom | **uv** only |
-| pi | **bun** global (`bun install -g …`); wrappers in `~/.local/bin` — **no Node/npm** |
+| browser-use | **uv tool** (multi-device via activation); Chrome remote debugging for doctor |
+| webwright | skill symlink under `~/.agents/skills` (optional long-horizon web) |
+| omp | **binary only** via activation (`install-omp.sh`); config + harness in `~/.dotfiles/omp` — **not** Nix `home.file` |
 | Ghostty / Zed / Signal / Slack / WhatsApp | Nix home packages |
 | zellij | Flake input [kaankoken/zellij](https://github.com/kaankoken/zellij) (`main`) via `overlays.default` |
 | Outlook | Manual |
@@ -152,7 +155,7 @@ scripts/archived/              # former Nu bootstrap/smoke
 - **zerobrew (`zb`)** first for **mole / aerospace**; if zb cannot resolve a package, fall back to **Homebrew**. AeroSpace: `brew install --cask nikitabobko/tap/aerospace`.
 - **rtk / codex / caveman / ponytail:** agent installers in `modules/agents` (not zerobrew).
 - **caveman:** multi-agent skill (not a PATH binary); installer wants Node ≥18 — soft-fail if missing.
-- **ponytail:** lean-code skill (not a PATH binary); Claude/Codex plugins + `pi install` + portable skills under `~/.agents/skills` — soft-fail if all paths fail. Complements caveman (prose vs code).
+- **ponytail:** lean-code skill (not a PATH binary); Claude/Codex plugins + portable skills under `~/.agents/skills` — soft-fail if all paths fail. Complements caveman (prose vs code).
 - **headroom:** uv only (`modules/agents`); smoke lists it as optional.
 - **rtk / mole / aerospace:** optional in smoke; rtk via agents, mole/aerospace via zerobrew.
 - **Secrets** stay outside this flake (keychain / existing logins).
@@ -169,3 +172,17 @@ Licensed under either of
 at your option. Unless you explicitly state otherwise, any contribution
 intentionally submitted for inclusion in this work shall be dual-licensed as
 above, without any additional terms or conditions.
+
+## OMP-only harness (post Stage 4)
+
+Nix installs the **omp** binary only. Configuration and the goal harness live in
+`~/.dotfiles/omp` (linked via `omp/link.sh`). Shared policy: `~/.dotfiles/agent-stack`.
+
+```bash
+# Cross-repo smoke (migration worktree or post-merge ~/.dotfiles)
+DOTFILES_ROOT=/path/to/dotfiles bash scripts/smoke-omp-migration.sh
+bash scripts/test-no-pi-runtime.sh all
+bash scripts/test-omp-installer.sh
+```
+
+Pi is not installed by this flake. Daily entry: `omp` + `/harness` after link.

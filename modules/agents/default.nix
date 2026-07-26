@@ -9,14 +9,19 @@ let
   # Official channels change — keep commands documented and soft.
   #
   # Shared stack (see AGENTS.md): RTK, beads, headroom, tokensave, caveman,
+  # browser-use (uv tool; Chrome CDP), webwright optional (long-horizon Playwright),
   # ponytail, context-mode, context7, ast-grep (Nix). Code graph = tokensave only
   # (codebase-memory is stripped on activate).
   #
-  # No system Node/npm for agent runtimes we control: pi / context-mode via bun.
+  # No system Node/npm for agent runtimes we control: context-mode via bun.
   # codex / rtk / grok / claude / beads / caveman / ponytail: official installers.
   # codex must NEVER use wrap_bun_cli — that made Codex think it was npm-managed
   # and could write-through-symlink clobber ~/.codex/packages/standalone/.../bin/codex.
   # Prefer ~/.local/bin so GUI / minimal-PATH agent shells still find tools.
+  # OMP binary only — configuration belongs to ~/.dotfiles/omp (not Nix home.file).
+  installOmpScript = pkgs.writeShellScript "install-omp" (
+    builtins.readFile ./scripts/install-omp.sh
+  );
   installScript = pkgs.writeShellScript "install-agent-tools" ''
     set +e
     export PATH="$HOME/.local/bin:${pkgs.bun}/bin:${pkgs.uv}/bin:${pkgs.curl}/bin:${pkgs.bash}/bin:${pkgs.python3}/bin:$HOME/.bun/bin:$HOME/.cargo/bin:/opt/zerobrew/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
@@ -148,14 +153,15 @@ let
 
     # Global bun package + ~/.local/bin wrapper that runs the entry under bun
     # (packages ship #!/usr/bin/env node; we never put Node on PATH).
-    # ONLY for pi (and similar pure-JS CLIs) — never codex/rtk/bd.
+    # ONLY for pure-JS CLIs that are not standalone-installed — never codex/rtk/bd.
     install_bun_cli() {
       local package="$1"
       local bin_name="$2"
       require_bun || return 1
       mkdir -p "$HOME/.local/bin" "$HOME/.bun/bin"
       log "bun install -g $package"
-      if ! bun install -g "$package"; then
+      # Isolate from ~/package.json which makes bun -g land in ~/node_modules
+      if ! ( cd /tmp && bun install -g "$package" ); then
         fail "bun install -g $package failed"
         return 1
       fi
@@ -188,6 +194,8 @@ let
       log "wrapper $dest -> bun $bun_bin"
       return 0
     }
+
+    # Pi binary installer removed (Stage 4 complete; OMP only).
 
     # --- codex helpers (standalone only; never bun/npm) ---
     codex_standalone_entrypoint() {
@@ -296,6 +304,108 @@ let
       fi
     fi
 
+    # Repair leftover package.json deps from retired agent installers.
+    python3 - <<'PY' || true
+import json
+from pathlib import Path
+
+STRIP_DEPS = (
+    "pi-extensions",
+    "@earendil-works/pi-coding-agent",
+    "pi-coding-agent",
+)
+home = Path.home()
+for path in (home / "package.json", home / ".dotfiles" / "package.json"):
+    if not path.exists():
+        continue
+    try:
+        real = path.resolve()
+        data = json.loads(real.read_text())
+    except Exception:
+        continue
+    deps = data.get("dependencies")
+    if not isinstance(deps, dict):
+        continue
+    stripped = [k for k in STRIP_DEPS if k in deps]
+    if not stripped:
+        continue
+    for key in stripped:
+        del deps[key]
+    data["dependencies"] = deps
+    real.write_text(json.dumps(data, indent=2) + "\n")
+    print("stripped", ", ".join(stripped), "from", real)
+for lock in (home / "bun.lock", home / ".dotfiles" / "bun.lock"):
+    if lock.is_file():
+        try:
+            lock.unlink()
+            print("removed", lock)
+        except Exception:
+            pass
+PY
+
+    # --- browser-use (uv tool → ~/.local/bin; attaches to running Chrome via CDP) ---
+    # https://github.com/browser-use/browser-use — no separate Chromium required if Chrome exists.
+    # Multi-device: always ensure CLI on this host so activation syncs the stack.
+    if command -v browser-use >/dev/null 2>&1 || [ -x "$HOME/.local/bin/browser-use" ]; then
+      export PATH="$HOME/.local/bin:$PATH"
+      ok "browser-use present ($(browser-use --version 2>/dev/null | head -1 || echo ok))"
+    else
+      log "installing browser-use via uv tool..."
+      if command -v uv >/dev/null 2>&1 && uv tool install browser-use; then
+        export PATH="$HOME/.local/bin:$PATH"
+        if command -v browser-use >/dev/null 2>&1 || [ -x "$HOME/.local/bin/browser-use" ]; then
+          ok "browser-use installed ($(browser-use --version 2>/dev/null | head -1 || echo ok))"
+        else
+          fail "browser-use uv install finished but binary not on PATH"
+        fi
+      else
+        fail "browser-use install failed — uv tool install browser-use"
+      fi
+    fi
+    # Soft: ensure shims live under ~/.local/bin for agent PATH
+    if [ -x "$HOME/.local/bin/browser-use" ]; then
+      export PATH="$HOME/.local/bin:$PATH"
+    fi
+
+    # --- webwright (optional tier-4 long-horizon Playwright code-as-action) ---
+    # https://github.com/microsoft/Webwright — soft-fail; skill for Pi/Claude/Codex.
+    # Prefer skill symlink for agents; full CLI install best-effort.
+    webwright_skill_dst="$HOME/.agents/skills/webwright"
+    if [ -f "$webwright_skill_dst/SKILL.md" ]; then
+      ok "webwright skill present at $webwright_skill_dst"
+    else
+      log "installing webwright skill (microsoft/Webwright) for multi-agent discovery..."
+      mkdir -p "$HOME/.agents/skills" "$HOME/.cache/nix-setup"
+      if [ ! -d "$HOME/.cache/nix-setup/Webwright/.git" ]; then
+        git clone --depth 1 https://github.com/microsoft/Webwright.git \
+          "$HOME/.cache/nix-setup/Webwright" 2>/dev/null \
+          || fail "webwright git clone failed"
+      else
+        git -C "$HOME/.cache/nix-setup/Webwright" pull --ff-only 2>/dev/null || true
+      fi
+      if [ -d "$HOME/.cache/nix-setup/Webwright/skills/webwright" ]; then
+        rm -rf "$webwright_skill_dst"
+        ln -sfn "$HOME/.cache/nix-setup/Webwright/skills/webwright" "$webwright_skill_dst"
+        ok "webwright skill linked → $webwright_skill_dst"
+      else
+        skip "webwright skill tree missing after clone"
+      fi
+    fi
+    if command -v webwright >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1; then
+      if command -v webwright >/dev/null 2>&1; then
+        ok "webwright CLI present"
+      elif command -v uv >/dev/null 2>&1 \
+        && [ -d "$HOME/.cache/nix-setup/Webwright" ]; then
+        # Best-effort editable/tool install for CLI; soft-fail (Playwright chromium optional)
+        if uv tool install --from "$HOME/.cache/nix-setup/Webwright" webwright 2>/dev/null \
+          || (cd "$HOME/.cache/nix-setup/Webwright" && uv pip install -e . 2>/dev/null); then
+          ok "webwright package install attempted"
+        else
+          skip "webwright CLI install soft-failed (skill still usable by host agents)"
+        fi
+      fi
+    fi
+
     # --- claude-code (official native installer when available) ---
     if command -v claude >/dev/null 2>&1; then
       ok "claude present"
@@ -349,21 +459,16 @@ let
       fi
     fi
 
-    # --- pi coding agent (https://pi.dev) via bun only ---
-    # Official install.sh requires Node/npm and may install Node — we do not use it.
-    if command -v pi >/dev/null 2>&1 || [ -e "$HOME/.bun/bin/pi" ]; then
-      [ -e "$HOME/.bun/bin/pi" ] && wrap_bun_cli pi || true
-      ok "pi present ($(pi --version 2>/dev/null | head -1 || echo ok))"
+    # OMP binary only. Configuration belongs to ~/.dotfiles/omp.
+    # Provider order: ZeroBrew → Homebrew can1357/tap/omp → https://omp.sh/install
+    if ${installOmpScript}; then
+      ok "omp present ($(omp --version 2>/dev/null | head -1 || echo ok))"
     else
-      log "installing pi via bun (@earendil-works/pi-coding-agent)..."
-      if install_bun_cli "@earendil-works/pi-coding-agent" pi; then
-        ok "pi via bun ($(pi --version 2>/dev/null | head -1 || echo ok))"
-      else
-        fail "pi install failed — bun install -g @earendil-works/pi-coding-agent"
-      fi
+      fail "omp install failed — ZeroBrew → Homebrew can1357/tap/omp → https://omp.sh/install"
     fi
 
-    # --- beads (official native binary; do NOT use bun/npm @beads/bd or crates.io) ---
+
+# --- beads (prefer install.sh over npm @beads/bd or crates.io) ---
     # https://github.com/gastownhall/beads — install.sh → ~/.local/bin/bd
     # bun/npm package only ships a node wrapper; postinstall often fails without node.
     # crates.io "beads" is a library stub with no binary.
@@ -437,11 +542,10 @@ let
     # --- RTK multi-agent hooks (binary already ensured above) ---
     # https://github.com/rtk-ai/rtk
     if command -v rtk >/dev/null 2>&1; then
-      log "rtk init for claude / codex / cursor / pi (auto-patch where supported)..."
+      log "rtk init for claude / codex / cursor (auto-patch where supported)..."
       rtk init -g --auto-patch 2>/dev/null && ok "rtk init claude" || fail "rtk init claude"
       rtk init -g --codex 2>/dev/null && ok "rtk init codex" || fail "rtk init codex"
       rtk init -g --agent cursor --auto-patch 2>/dev/null && ok "rtk init cursor" || fail "rtk init cursor"
-      rtk init -g --agent pi --auto-patch 2>/dev/null && ok "rtk init pi" || fail "rtk init pi"
     else
       fail "rtk missing — cannot run rtk init"
     fi
@@ -463,7 +567,7 @@ let
       ok "tokensave present ($(tokensave --version 2>/dev/null | head -1 || echo ok))"
     fi
     if command -v tokensave >/dev/null 2>&1; then
-      for agent in claude codex cursor pi grok; do
+      for agent in claude codex cursor grok; do
         if tokensave install --agent "$agent" --git-hook no 2>/dev/null; then
           ok "tokensave install --agent $agent"
         else
@@ -525,7 +629,7 @@ let
       _caveman_node_shim=""
       if { ! command -v node >/dev/null 2>&1 || ! command -v npx >/dev/null 2>&1; } \
         && command -v bun >/dev/null 2>&1; then
-        _caveman_node_shim=$(mktemp -d "${TMPDIR:-/tmp}/caveman-node.XXXXXX")
+        _caveman_node_shim=$(mktemp -d "''${TMPDIR:-/tmp}/caveman-node.XXXXXX")
         if ! command -v node >/dev/null 2>&1; then
           printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_caveman_node_shim/node"
           chmod +x "$_caveman_node_shim/node"
@@ -567,12 +671,11 @@ let
         || [ -e "$HOME/.cursor/skills/ponytail/SKILL.md" ] \
         || [ -d "$HOME/.agents/skills/ponytail" ] \
         || [ -d ".agents/skills/ponytail" ] \
-        || [ -d "$HOME/.gemini/extensions/ponytail" ] \
-        || [ -d "$HOME/.pi/agent/git/github.com/DietrichGebert/ponytail" ]
+        || [ -d "$HOME/.gemini/extensions/ponytail" ]
     }
 
     # Portable skill tree → ~/.agents/skills (Grok, Cursor, generic skill hosts).
-    # Host plugins (Claude/Codex/pi) add hooks/commands; this keeps the skill readable everywhere.
+    # Host plugins (Claude/Codex) add hooks/commands; this keeps the skill readable everywhere.
     install_ponytail_skill_files() {
       local dest_root="$1"
       local skill name url
@@ -626,34 +729,11 @@ let
         fi
       fi
 
-      # pi package extension (needs npm for git installs; shim with bun when missing)
-      if command -v pi >/dev/null 2>&1; then
-        _ponytail_pi_shim=""
-        if ! command -v npm >/dev/null 2>&1 && command -v bun >/dev/null 2>&1; then
-          _ponytail_pi_shim=$(mktemp -d "${TMPDIR:-/tmp}/ponytail-pi.XXXXXX")
-          # pi's git install runs `npm install`; bun is npm-compatible enough here.
-          printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_ponytail_pi_shim/npm"
-          chmod +x "$_ponytail_pi_shim/npm"
-          export PATH="$_ponytail_pi_shim:$PATH"
-        fi
-        if pi install git:github.com/DietrichGebert/ponytail 2>/dev/null \
-          || pi install https://github.com/DietrichGebert/ponytail 2>/dev/null \
-          || pi install npm:@dietrichgebert/ponytail 2>/dev/null; then
-          ok "ponytail: pi package installed"
-          _ponytail_any=1
-        else
-          skip "ponytail: pi install failed (needs npm or bun shim; portable skills still work)"
-        fi
-        if [ -n "$_ponytail_pi_shim" ]; then
-          rm -rf "$_ponytail_pi_shim"
-        fi
-      fi
-
       # skills CLI (global) — same bun→node shims as caveman when Node missing
       _ponytail_node_shim=""
       if { ! command -v node >/dev/null 2>&1 || ! command -v npx >/dev/null 2>&1; } \
         && command -v bun >/dev/null 2>&1; then
-        _ponytail_node_shim=$(mktemp -d "${TMPDIR:-/tmp}/ponytail-node.XXXXXX")
+        _ponytail_node_shim=$(mktemp -d "''${TMPDIR:-/tmp}/ponytail-node.XXXXXX")
         if ! command -v node >/dev/null 2>&1; then
           printf '%s\n' '#!/bin/sh' 'exec bun "$@"' >"$_ponytail_node_shim/node"
           chmod +x "$_ponytail_node_shim/node"
@@ -676,18 +756,20 @@ let
         rm -rf "$_ponytail_node_shim"
       fi
 
-      # Always seed portable skill files under ~/.agents/skills (and project if present)
+      # Portable skill files for multi-agent hosts.
       mkdir -p "$HOME/.agents/skills"
       if install_ponytail_skill_files "$HOME/.agents/skills"; then
-        ok "ponytail: skill files in ~/.agents/skills"
+        ok "ponytail: skill files in ~/.agents/skills (portable)"
         _ponytail_any=1
       fi
-      if [ -d ".agents/skills" ] || [ -d ".agents" ]; then
-        mkdir -p ".agents/skills"
-        if install_ponytail_skill_files ".agents/skills"; then
-          ok "ponytail: skill files in .agents/skills"
-          _ponytail_any=1
-        fi
+      # Drop accidental project copies that cause Skill conflicts in this repo
+      if [ -d ".agents/skills" ]; then
+        for _pt in ponytail ponytail-review ponytail-audit ponytail-debt ponytail-gain ponytail-help; do
+          if [ -e ".agents/skills/$_pt" ]; then
+            rm -rf ".agents/skills/$_pt"
+            log "removed project .agents/skills/$_pt (use ~/.agents/skills)"
+          fi
+        done
       fi
 
       if [ "$_ponytail_any" -eq 1 ]; then
@@ -785,7 +867,6 @@ def merge_mcp_json(path):
 
 merge_mcp_json(home / ".claude" / ".mcp.json")
 merge_mcp_json(home / ".cursor" / "mcp.json")
-
 for claude_json in [home / ".claude" / ".claude.json", home / ".claude.json"]:
     if not claude_json.is_file():
         continue
@@ -887,6 +968,9 @@ in
     curl
     python3
   ];
+
+  # OMP configuration is owned by ~/.dotfiles/omp (not Nix home.file).
+  home.file = { };
 
   home.activation.installAgentTools = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     echo "=== agent tools activation (fail-soft; shared stack: rtk/tokensave/headroom/context-mode/context7/caveman) ==="

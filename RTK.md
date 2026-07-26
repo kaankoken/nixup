@@ -33,10 +33,9 @@ rtk discover        # Missed savings opportunities
 rtk init -g --auto-patch           # Claude Code
 rtk init -g --codex                # Codex (AGENTS.md + RTK.md)
 rtk init -g --agent cursor --auto-patch
-rtk init -g --agent pi --auto-patch
 ```
 
-Grok and other agents without a dedicated RTK hook: follow this file + `AGENTS.md` and prefix shell with `rtk` manually.
+Grok, OMP, and other agents without a dedicated RTK hook: follow this file + `AGENTS.md` and prefix shell with `rtk` manually.
 
 ## Verification
 

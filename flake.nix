@@ -84,6 +84,8 @@
               home-manager = {
                 useGlobalPkgs = true;
                 useUserPackages = true;
+                # Backup colliding regular files instead of failing apply
+                backupFileExtension = "hm-bak";
                 extraSpecialArgs = mkSpecialArgs system // {
                   inherit hostName user;
                 };

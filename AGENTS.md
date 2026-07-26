@@ -2,7 +2,7 @@
 
 # Shared agent tooling (all agents)
 
-Same stack for Claude Code, Codex, Cursor, Grok, pi, and anything new.
+Same stack for Claude Code, Codex, Cursor, Grok, OMP, and anything new.
 Do **not** invent a parallel workflow per agent.
 
 ## Ownership
@@ -10,6 +10,8 @@ Do **not** invent a parallel workflow per agent.
 | Piece | Owner |
 |-------|--------|
 | **Packages / MCP installers / `sg` wrapper** | this flake (`modules/common`, `modules/agents`) |
+| **OMP binary only** | this flake (`modules/agents` installer) |
+| **OMP config / goal harness** | **`~/.dotfiles/omp`** (not Nix `home.file`) |
 | **Global agent instruction files** | **`.dotfiles/agent-stack/`** (stow/symlink, not Nix) |
 | **This file** | project-local rules when working in nix-setup |
 
@@ -19,6 +21,8 @@ Global hosts load the stack via symlinks:
 ~/.dotfiles/agent-stack/link.sh
 # -> ~/.agents/AGENTS.md, ~/.claude/CLAUDE.md, ~/.codex/AGENTS.md,
 #    ~/.grok/Agents.md, ~/AGENTS.md, ~/.cursor/rules/shared-agent-stack.mdc
+# OMP config/link:
+#    ~/.dotfiles/omp/link.sh  -> ~/.omp/agent (config only; binary from Nix)
 ```
 
 Do **not** reintroduce codebase-memory into host `AGENTS.md` files. Re-run
@@ -63,7 +67,7 @@ copies when the Nix profile binary exists.
 | JSON | **`jq`** | hand-rolled parsers |
 | GitHub | **`gh`** | raw `curl` to api.github.com when `gh` covers it |
 | Python tooling | **`uv`** | bare `pip`/`pipx` for project/tool installs |
-| JS CLIs in this setup | **`bun`** | system `node`/`npm` for packages we control (pi, context-mode) |
+| JS CLIs in this setup | **`bun`** | system `node`/`npm` for packages we control (context-mode) |
 | Rust checks | **`bacon`**, **`cargo nextest`** | long unfiltered `cargo test` loops when nextest/bacon fit |
 | Nix rebuild / search | **`nh`**, **`nom`** | raw `nixos-rebuild` / noisy `nix build` without nom when `nh` works |
 | Semantic structural diff | **`difft`** (difftastic) | huge unified diffs when structure matters |
@@ -184,3 +188,40 @@ headroom wrap codex
 ```
 
 Do not configure a second “primary” code-intelligence MCP alongside tokensave.
+
+## Browser / web (shared stack)
+
+| Tier | Tool | Install |
+|------|------|---------|
+| Search+fetch | agents / curl | always |
+| CDP short | chrome-cdp (soft) | optional skill install |
+| Heavy live | **browser-use** | `modules/agents` → `uv tool install browser-use` |
+| Long-horizon | **Webwright** skill | `~/.agents/skills/webwright` (activation clone) |
+
+Chrome remote debugging for browser-use: `chrome://inspect/#remote-debugging`.
+
+## OMP goal harness
+
+OMP uses the **same** stack above — not a parallel toolkit. Nix installs only the
+**omp** binary. Configuration, agents, workflows, and the goal harness live under
+[`~/.dotfiles/omp`](https://github.com/) (linked into `~/.omp/agent` by
+`~/.dotfiles/omp/link.sh`; never touch `auth.json`).
+
+| Entry | Behavior |
+|-------|----------|
+| `/harness [text]` | Full multi-model harness (superpowers live skills + bd SoT) |
+| `/goal` / `/guided-goal` | Native OMP (unshadowed by harness) |
+| `/init` | Project scaffold only (`project-init` + AGENTS templates) |
+
+Smoke after activation: `~/.dotfiles/omp` tests (`bash tests/smoke-omp-harness.sh`).
+Design: `docs/superpowers/specs/2026-07-24-omp-goal-harness-migration-design.md`.
+No-Pi source guard: `scripts/test-no-pi-runtime.sh`.
+
+## Verification (OMP migration)
+
+```bash
+bash scripts/test-no-pi-runtime.sh all
+DOTFILES_ROOT=~/.dotfiles bash scripts/smoke-omp-migration.sh
+# or pre-merge:
+# DOTFILES_ROOT=/path/to/.worktrees/dotfiles-omp-goal-harness-migration bash scripts/smoke-omp-migration.sh
+```
