@@ -172,3 +172,17 @@ Licensed under either of
 at your option. Unless you explicitly state otherwise, any contribution
 intentionally submitted for inclusion in this work shall be dual-licensed as
 above, without any additional terms or conditions.
+
+## OMP-only harness (post Stage 4)
+
+Nix installs the **omp** binary only. Configuration and the goal harness live in
+`~/.dotfiles/omp` (linked via `omp/link.sh`). Shared policy: `~/.dotfiles/agent-stack`.
+
+```bash
+# Cross-repo smoke (migration worktree or post-merge ~/.dotfiles)
+DOTFILES_ROOT=/path/to/dotfiles bash scripts/smoke-omp-migration.sh
+bash scripts/test-no-pi-runtime.sh all
+bash scripts/test-omp-installer.sh
+```
+
+Pi is not installed by this flake. Daily entry: `omp` + `/harness` after link.

@@ -216,3 +216,12 @@ OMP uses the **same** stack above — not a parallel toolkit. Nix installs only 
 Smoke after activation: `~/.dotfiles/omp` tests (`bash tests/smoke-omp-harness.sh`).
 Design: `docs/superpowers/specs/2026-07-24-omp-goal-harness-migration-design.md`.
 No-Pi source guard: `scripts/test-no-pi-runtime.sh`.
+
+## Verification (OMP migration)
+
+```bash
+bash scripts/test-no-pi-runtime.sh all
+DOTFILES_ROOT=~/.dotfiles bash scripts/smoke-omp-migration.sh
+# or pre-merge:
+# DOTFILES_ROOT=/path/to/.worktrees/dotfiles-omp-goal-harness-migration bash scripts/smoke-omp-migration.sh
+```
