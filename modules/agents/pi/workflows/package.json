@@ -1,5 +1,0 @@
-{
-  "type": "module",
-  "private": true,
-  "description": "ESM marker for pi-dynamic-workflows templates (export const meta + top-level await). Enables node --check."
-}

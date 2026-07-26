@@ -50,6 +50,7 @@ required = [
 optional = [
   "rtk",
   "claude",
+  "omp",
 ]
 
 [smoke.darwin]

@@ -12,8 +12,8 @@
   };
 
   home.sessionPath = [
-    "$HOME/.local/bin" # agent CLIs (codex/rtk/bd standalone), pi bun wrapper, uv tools
-    "$HOME/.bun/bin" # bun global bins (pi only — never codex)
+    "$HOME/.local/bin" # agent CLIs (codex/rtk/bd/omp standalone), uv tools
+    "$HOME/.bun/bin" # bun global bins (e.g. context-mode — never codex)
     "$HOME/.cargo/bin"
   ];
 }

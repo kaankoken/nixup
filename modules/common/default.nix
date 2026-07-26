@@ -55,7 +55,8 @@ in
   # codex is standalone only — agents purges legacy bun/npm wrappers on activate.
   # headroom: uv tool install in modules/agents (not Nix).
   # rustc/cargo: rustup activation; bacon + cargo-nextest from Nix.
-  # JS CLIs still on bun: pi + context-mode; no system nodejs/npm in this flake.
+  # JS CLIs still on bun: context-mode; no system nodejs/npm in this flake.
+  # OMP binary via modules/agents installer; OMP config is ~/.dotfiles/omp only.
   # Shared agent stack + local CLI toolkit (rg/fd/eza/bat/sd/ast-grep/…):
   # see AGENTS.md (prefer modern binaries; agents must not fall back to grep/find/sed).
 
