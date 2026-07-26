@@ -468,7 +468,7 @@ PY
     fi
 
 
-pm @beads/bd or crates.io) ---
+# --- beads (prefer install.sh over npm @beads/bd or crates.io) ---
     # https://github.com/gastownhall/beads — install.sh → ~/.local/bin/bd
     # bun/npm package only ships a node wrapper; postinstall often fails without node.
     # crates.io "beads" is a library stub with no binary.
@@ -671,7 +671,7 @@ pm @beads/bd or crates.io) ---
         || [ -e "$HOME/.cursor/skills/ponytail/SKILL.md" ] \
         || [ -d "$HOME/.agents/skills/ponytail" ] \
         || [ -d ".agents/skills/ponytail" ] \
-        || [ -d "$HOME/.gemini/extensions/ponytail" ] \
+        || [ -d "$HOME/.gemini/extensions/ponytail" ]
     }
 
     # Portable skill tree → ~/.agents/skills (Grok, Cursor, generic skill hosts).
