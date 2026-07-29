@@ -112,14 +112,15 @@ fi
 if [ -f "$OMP_ROOT/config.yml" ]; then
   if rg -q 'strategy:\s*shake' "$OMP_ROOT/config.yml" \
     && rg -q 'enabled:\s*false' "$OMP_ROOT/config.yml" \
-    && rg -q 'approvalMode:\s*always-ask' "$OMP_ROOT/config.yml"; then
+    && rg -q 'approvalMode:\s*yolo' "$OMP_ROOT/config.yml" \
+    && [ -f "$OMP_ROOT/extensions/smart-approve/dist/index.js" ]; then
     ok lean_config
   else
     # softer: just strategy shake
     if rg -q 'strategy:\s*shake' "$OMP_ROOT/config.yml"; then
       ok lean_config_shake
     else
-      bad lean_config "config.yml missing shake/always-ask markers"
+      bad lean_config "config.yml missing shake/yolo + smart-approve markers"
     fi
   fi
 else
