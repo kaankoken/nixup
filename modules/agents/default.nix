@@ -22,6 +22,8 @@ let
   installOmpScript = pkgs.writeShellScript "install-omp" (
     builtins.readFile ./scripts/install-omp.sh
   );
+  # Vendored architect skill tree (improved software-architecture-design).
+  architectSkillSrc = ./skills/architect;
   installScript = pkgs.writeShellScript "install-agent-tools" ''
     set +e
     export PATH="$HOME/.local/bin:${pkgs.bun}/bin:${pkgs.uv}/bin:${pkgs.curl}/bin:${pkgs.bash}/bin:${pkgs.python3}/bin:$HOME/.bun/bin:$HOME/.cargo/bin:/opt/zerobrew/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
@@ -781,6 +783,34 @@ PY
       else
         fail "ponytail install failed — see https://github.com/DietrichGebert/ponytail#install"
       fi
+    fi
+
+    # --- architect skill (OMP /design; vendored offline tree) ---
+    # Source: modules/agents/skills/architect (upstream pin in UPSTREAM.md)
+    architect_marker() {
+      [ -e "$HOME/.agents/skills/architect/SKILL.md" ]
+    }
+    install_architect_skill_files() {
+      local dest="$HOME/.agents/skills/architect"
+      local src="${architectSkillSrc}"
+      [ -d "$src" ] || return 1
+      mkdir -p "$HOME/.agents/skills" || return 1
+      rm -rf "$dest"
+      # Prefer cp -R for portability (no rsync required on activate).
+      cp -R "$src" "$dest" || return 1
+      # Drop upstream backup from install target if present
+      rm -f "$dest/SKILL.upstream.md"
+      [ -f "$dest/SKILL.md" ] || return 1
+      return 0
+    }
+    if install_architect_skill_files; then
+      if architect_marker; then
+        ok "architect skill in ~/.agents/skills/architect"
+      else
+        fail "architect copy finished but SKILL.md missing"
+      fi
+    else
+      fail "architect skill install failed (design-flow fail-open without it)"
     fi
 
     # --- beads multi-agent setup (binary already ensured above) ---
